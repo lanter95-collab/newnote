@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- 補全 CSP 政策：允許連接 api.imgbb.com 以及顯示 imgBB 託管的圖片 -->
-    <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob: gap: content:; connect-src * https://api.imgbb.com https://*.firebaseio.com wss://*.firebaseio.com; img-src * data: blob: https://i.ibb.co https://*.imgbb.com;">
+    <!-- 補全 CSP 政策：允許連接 Cloudinary API 以及顯示 Cloudinary 託管的圖片 -->
+    <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob: gap: content:; connect-src * https://api.cloudinary.com https://*.firebaseio.com wss://*.firebaseio.com; img-src * data: blob: https://res.cloudinary.com;">
     <title>智慧雲端筆記</title>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
@@ -170,7 +170,7 @@
         .related-link { font-size: 13px; color: #555; background: var(--related-bg); padding: 4px 8px; border-radius: 4px; display: block; margin-bottom: 4px; border-left: 3px solid var(--related-border); }
         .related-link:hover { background: var(--border-color); border-left-color: var(--primary-color); }
         .image-gallery { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; pointer-events: auto; }
-        .note-img { width: 80px; height: 80px; object-fit: cover; border-radius: 6px; cursor: zoom-in; border: 1px solid var(--border-color); }
+        .note-img { width: 30px; height: 30px; object-fit: cover; border-radius: 6px; cursor: zoom-in; border: 1px solid var(--border-color); }
         
         /* 底部底欄結構布局 */
         .note-footer { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 8px; }
@@ -262,12 +262,12 @@
             <div id="imageUrlContainer" style="display: flex; flex-direction: column; gap: 6px; width: 100%;">
                 <div class="row-mixed image-url-row">
                     <input type="text" class="input-style input-sub img-url-input" style="height: 32px;" placeholder="圖片網址...">
-                    <button type="button" class="img-url-btn" onclick="triggerImgbbUpload(this)" title="上傳圖片至 imgBB">☁️</button>
+                    <button type="button" class="img-url-btn" onclick="triggerCloudinaryUpload(this)" title="上傳圖片至 Cloudinary">☁️</button>
                     <button type="button" class="img-url-btn" onclick="addUrlRow()">＋</button>
                 </div>
             </div>
-            <!-- 隱藏的 imgBB 上傳 Input -->
-            <input type="file" id="imgbbFileInput" style="display:none" accept="image/*" onchange="uploadToImgbb(event)">
+            <!-- 隱藏的 Cloudinary 上傳 Input -->
+            <input type="file" id="cloudinaryFileInput" style="display:none" accept="image/*" onchange="uploadToCloudinary(event)">
 
             <div class="row-mixed">
                 <input type="text" id="noteKeywords" class="input-style input-sub" style="height: 32px;" placeholder="關鍵字" onkeydown="handleKeywordsKeydown(event)" oninput="handleSuggest('keywords')">
@@ -315,6 +315,7 @@
             <textarea id="editContent" class="input-style" style="height:250px; margin-bottom:15px; resize:vertical;" onkeydown="handleEditContentKeydown(event)"></textarea>
             <div class="row-mixed" style="margin-bottom:10px">
                 <input type="text" id="editKeywords" class="input-style input-sub" style="height: 32px;" placeholder="關鍵字">
+                <button type="button" class="img-url-btn" onclick="triggerCloudinaryUploadEdit(this)" title="上傳圖片至 Cloudinary">☁️</button>
                 <div class="add-img-icon" onclick="document.getElementById('editImgInput').click()">+</div>
                 <div id="edit-preview-area"></div>
                 <input type="file" id="editImgInput" style="display:none" accept="image/*" multiple onchange="handleEditImages(event)">
@@ -363,8 +364,10 @@
         let startX = 0, startY = 0;
         let isPinched = false;
 
-        // 儲存當前觸發上傳的圖片網址輸入框
+        // 儲存當前觸發上傳的圖片網址輸入框，以及對應的按鈕與模式（'url' = 填入網址欄；'edit' = 直接加入編輯視窗的圖片清單）
         let currentTargetInput = null;
+        let currentUploadBtn = null;
+        let currentUploadMode = 'url';
 
         // 偵測網址參數是否進入「分享模式」
         const urlParams = new URLSearchParams(window.location.search);
@@ -381,7 +384,7 @@
             newRow.className = 'row-mixed image-url-row';
             newRow.innerHTML = `
                 <input type="text" class="input-style input-sub img-url-input" style="height: 32px;" placeholder="圖片網址...">
-                <button type="button" class="img-url-btn" onclick="triggerImgbbUpload(this)" title="上傳圖片至 imgBB">☁️</button>
+                <button type="button" class="img-url-btn" onclick="triggerCloudinaryUpload(this)" title="上傳圖片至 Cloudinary">☁️</button>
                 <button type="button" class="img-url-btn" onclick="addUrlRow()">＋</button>
                 <button type="button" class="img-url-btn" onclick="removeUrlRow(this)">－</button>
             `;
@@ -400,53 +403,68 @@
             container.innerHTML = `
                 <div class="row-mixed image-url-row">
                     <input type="text" class="input-style input-sub img-url-input" style="height: 32px;" placeholder="圖片網址...">
-                    <button type="button" class="img-url-btn" onclick="triggerImgbbUpload(this)" title="上傳圖片至 imgBB">☁️</button>
+                    <button type="button" class="img-url-btn" onclick="triggerCloudinaryUpload(this)" title="上傳圖片至 Cloudinary">☁️</button>
                     <button type="button" class="img-url-btn" onclick="addUrlRow()">＋</button>
                 </div>
             `;
         }
 
-        // 觸發 imgBB 檔案選擇器
-        function triggerImgbbUpload(btn) {
+        // 觸發 Cloudinary 檔案選擇器（新增筆記表單的圖片網址列）
+        function triggerCloudinaryUpload(btn) {
             const row = btn.closest('.image-url-row');
             currentTargetInput = row ? row.querySelector('.img-url-input') : null;
-            document.getElementById('imgbbFileInput').click();
+            currentUploadBtn = btn;
+            currentUploadMode = 'url';
+            document.getElementById('cloudinaryFileInput').click();
         }
 
-        // imgBB 上傳邏輯（已修正字串處理與連線例外處理）
-        async function uploadToImgbb(e) {
+        // 觸發 Cloudinary 檔案選擇器（編輯視窗，上傳後直接加入圖片清單）
+        function triggerCloudinaryUploadEdit(btn) {
+            currentTargetInput = null;
+            currentUploadBtn = btn;
+            currentUploadMode = 'edit';
+            document.getElementById('cloudinaryFileInput').click();
+        }
+
+        // Cloudinary 上傳邏輯（已修正字串處理與連線例外處理）
+        async function uploadToCloudinary(e) {
             const file = e.target.files[0];
             if (!file) return;
 
-            // 你的 API Key
-            const apiKey = '3e63e52100d718b4fe1b7f8be452fd15';
+            // 你的 Cloudinary 帳號設定
+            const cloudName = 'keloftva';
+            const uploadPreset = 'ml_default';
 
-            const originalBtn = currentTargetInput ? currentTargetInput.parentElement.querySelector('button[title*="imgBB"]') : null;
-            if (originalBtn) originalBtn.innerText = '⏳';
+            if (currentUploadBtn) currentUploadBtn.innerText = '⏳';
 
             const formData = new FormData();
-            formData.append('image', file);
+            formData.append('file', file);
+            formData.append('upload_preset', uploadPreset);
 
             try {
-                const response = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
+                const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
                     method: 'POST',
                     body: formData
                 });
                 const result = await response.json();
 
-                if (result.success) {
-                    const imageUrl = result.data.url;
-                    if (currentTargetInput) {
+                if (result.secure_url) {
+                    const imageUrl = result.secure_url;
+                    if (currentUploadMode === 'edit') {
+                        editImages.push(imageUrl);
+                        updateEditPreview();
+                    } else if (currentTargetInput) {
                         currentTargetInput.value = imageUrl;
                     }
-                    alert('圖片已成功上傳至 imgBB！');
+                    alert('圖片已成功上傳至 Cloudinary！');
                 } else {
                     alert('上傳失敗：' + (result.error ? result.error.message : '未知錯誤'));
                 }
             } catch (err) {
                 alert('上傳發生錯誤：' + err.message);
             } finally {
-                if (originalBtn) originalBtn.innerText = '☁️';
+                if (currentUploadBtn) currentUploadBtn.innerText = '☁️';
+                currentUploadBtn = null;
                 e.target.value = '';
             }
         }
