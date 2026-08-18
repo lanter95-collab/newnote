@@ -170,7 +170,7 @@
         .related-link { font-size: 13px; color: #555; background: var(--related-bg); padding: 4px 8px; border-radius: 4px; display: block; margin-bottom: 4px; border-left: 3px solid var(--related-border); }
         .related-link:hover { background: var(--border-color); border-left-color: var(--primary-color); }
         .image-gallery { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; pointer-events: auto; }
-        .note-img { width: 80px; height: 80px; object-fit: cover; border-radius: 6px; cursor: zoom-in; border: 1px solid var(--border-color); }
+        .note-img { width: 30px; height: 30px; object-fit: cover; border-radius: 6px; cursor: zoom-in; border: 1px solid var(--border-color); }
         
         /* 底部底欄結構布局 */
         .note-footer { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 8px; }
@@ -315,6 +315,7 @@
             <textarea id="editContent" class="input-style" style="height:250px; margin-bottom:15px; resize:vertical;" onkeydown="handleEditContentKeydown(event)"></textarea>
             <div class="row-mixed" style="margin-bottom:10px">
                 <input type="text" id="editKeywords" class="input-style input-sub" style="height: 32px;" placeholder="關鍵字">
+                <button type="button" class="img-url-btn" onclick="triggerCloudinaryUploadEdit(this)" title="上傳圖片至 Cloudinary">☁️</button>
                 <div class="add-img-icon" onclick="document.getElementById('editImgInput').click()">+</div>
                 <div id="edit-preview-area"></div>
                 <input type="file" id="editImgInput" style="display:none" accept="image/*" multiple onchange="handleEditImages(event)">
@@ -363,8 +364,10 @@
         let startX = 0, startY = 0;
         let isPinched = false;
 
-        // 儲存當前觸發上傳的圖片網址輸入框
+        // 儲存當前觸發上傳的圖片網址輸入框，以及對應的按鈕與模式（'url' = 填入網址欄；'edit' = 直接加入編輯視窗的圖片清單）
         let currentTargetInput = null;
+        let currentUploadBtn = null;
+        let currentUploadMode = 'url';
 
         // 偵測網址參數是否進入「分享模式」
         const urlParams = new URLSearchParams(window.location.search);
@@ -406,10 +409,20 @@
             `;
         }
 
-        // 觸發 Cloudinary 檔案選擇器
+        // 觸發 Cloudinary 檔案選擇器（新增筆記表單的圖片網址列）
         function triggerCloudinaryUpload(btn) {
             const row = btn.closest('.image-url-row');
             currentTargetInput = row ? row.querySelector('.img-url-input') : null;
+            currentUploadBtn = btn;
+            currentUploadMode = 'url';
+            document.getElementById('cloudinaryFileInput').click();
+        }
+
+        // 觸發 Cloudinary 檔案選擇器（編輯視窗，上傳後直接加入圖片清單）
+        function triggerCloudinaryUploadEdit(btn) {
+            currentTargetInput = null;
+            currentUploadBtn = btn;
+            currentUploadMode = 'edit';
             document.getElementById('cloudinaryFileInput').click();
         }
 
@@ -422,8 +435,7 @@
             const cloudName = 'keloftva';
             const uploadPreset = 'ml_default';
 
-            const originalBtn = currentTargetInput ? currentTargetInput.parentElement.querySelector('button[title*="Cloudinary"]') : null;
-            if (originalBtn) originalBtn.innerText = '⏳';
+            if (currentUploadBtn) currentUploadBtn.innerText = '⏳';
 
             const formData = new FormData();
             formData.append('file', file);
@@ -438,7 +450,10 @@
 
                 if (result.secure_url) {
                     const imageUrl = result.secure_url;
-                    if (currentTargetInput) {
+                    if (currentUploadMode === 'edit') {
+                        editImages.push(imageUrl);
+                        updateEditPreview();
+                    } else if (currentTargetInput) {
                         currentTargetInput.value = imageUrl;
                     }
                     alert('圖片已成功上傳至 Cloudinary！');
@@ -448,7 +463,8 @@
             } catch (err) {
                 alert('上傳發生錯誤：' + err.message);
             } finally {
-                if (originalBtn) originalBtn.innerText = '☁️';
+                if (currentUploadBtn) currentUploadBtn.innerText = '☁️';
+                currentUploadBtn = null;
                 e.target.value = '';
             }
         }
