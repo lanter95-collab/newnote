@@ -227,7 +227,6 @@
         .info-bar-count { font-size: 11px; color: var(--text-secondary); margin-left: 4px; white-space: nowrap; }
         
         .highlight { background-color: #d1e7dd; color: #0f5132; padding: 0 2px; border-radius: 2px; }
-        .drag-over { border-color: var(--primary-color) !important; background-color: var(--btn-bg-color) !important; }
         .load-more-zone { width: 100%; text-align: center; margin-top: 10px; margin-bottom: 30px; }
 
         @media (max-width: 600px) {
@@ -497,60 +496,6 @@
                 saveNote();
             }
         }
-
-        document.getElementById('noteContent').addEventListener('paste', (e) => {
-            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
-            for (let item of items) {
-                if (item.type.indexOf('image') === 0) {
-                    const file = item.getAsFile();
-                    processImageFile(file, 'add');
-                }
-            }
-        });
-
-        document.getElementById('modalNoteContent').addEventListener('paste', (e) => {
-            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
-            for (let item of items) {
-                if (item.type.indexOf('image') === 0) {
-                    const file = item.getAsFile();
-                    processImageFile(file, 'add');
-                }
-            }
-        });
-
-        document.getElementById('editContent').addEventListener('paste', (e) => {
-            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
-            for (let item of items) {
-                if (item.type.indexOf('image') === 0) {
-                    const file = item.getAsFile();
-                    processImageFile(file, 'edit');
-                }
-            }
-        });
-
-        const dragArea = document.getElementById('noteContent');
-        const dragAreaModal = document.getElementById('modalNoteContent');
-        const dragAreaEdit = document.getElementById('editContent');
-        [dragArea, dragAreaModal, dragAreaEdit].forEach(element => {
-            element.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                dragArea.classList.add('drag-over');
-            });
-            element.addEventListener('dragleave', () => {
-                dragArea.classList.remove('drag-over');
-            });
-            element.addEventListener('drop', (e) => {
-                e.preventDefault();
-                dragArea.classList.remove('drag-over');
-                const files = e.dataTransfer.files;
-                const mode = (element === dragAreaEdit) ? 'edit' : 'add';
-                for (let file of files) {
-                    if (file.type.indexOf('image') === 0) {
-                        processImageFile(file, mode);
-                    }
-                }
-            });
-        });
 
         dbCat.on('value', (snapshot) => {
             const data = snapshot.val();
@@ -1026,29 +971,6 @@
             tempImages = [];
             document.getElementById('preview-area').innerHTML = '';
             document.getElementById('todoToggleBtn').innerText = '☐';
-        }
-
-        function processImageFile(file, mode) {
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                const img = new Image();
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    const maxW = 400; let w = img.width, h = img.height;
-                    if (w > maxW) { h *= maxW / w; w = maxW; }
-                    canvas.width = w; canvas.height = h;
-                    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-                    if (mode === 'edit') {
-                        editImages.push(canvas.toDataURL('image/jpeg', 0.7));
-                        updateEditPreview();
-                    } else {
-                        tempImages.push(canvas.toDataURL('image/jpeg', 0.7));
-                        updatePreview();
-                    }
-                };
-                img.src = ev.target.result;
-            };
-            reader.readAsDataURL(file);
         }
 
         function removeTempImage(idx) {
