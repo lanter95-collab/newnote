@@ -119,6 +119,67 @@
             padding: 0 10px;
         }
 
+        /* 新增筆記的圓形浮動按鈕 */
+        .add-note-fab {
+            width: 36px;
+            height: 36px;
+            flex-shrink: 0;
+            border: none;
+            border-radius: 50%;
+            background: var(--primary-color);
+            color: #fff;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            padding: 0;
+        }
+        .add-note-fab:active { opacity: 0.7; }
+
+        /* 圓形雲端上傳按鈕（輸入內容視窗用） */
+        .img-url-btn.round { border-radius: 50%; }
+
+        /* 主要通知／提前通知：同一列，手機寬度不夠時可左右滑動 */
+        .reminder-row-scroll {
+            overflow-x: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 8px;
+            -webkit-overflow-scrolling: touch;
+        }
+        .reminder-row-inner {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 6px;
+            width: max-content;
+        }
+        .reminder-label { font-size: 11px; color: var(--text-secondary); white-space: nowrap; flex-shrink: 0; }
+        .reminder-datetime {
+            height: 26px;
+            width: 150px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            padding: 0 4px;
+            font-size: 11px;
+            background: var(--input-bg);
+            color: var(--text-color);
+            box-sizing: border-box;
+            flex-shrink: 0;
+        }
+        .reminder-repeat {
+            height: 26px;
+            width: 52px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            font-size: 10px;
+            background: var(--input-bg);
+            color: var(--text-color);
+            flex-shrink: 0;
+        }
+        .reminder-divider { width: 1px; height: 20px; background: var(--border-color); margin: 0 4px; flex-shrink: 0; }
+
         .search-bar { background: var(--input-bg); border-color: var(--border-color); width: 100%; }
         .suggestion-box { width: 100%; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; min-height: 0; }
         .sug-tag { font-size: 12px; background: var(--btn-bg-color); color: var(--primary-color); padding: 4px 10px; border-radius: 12px; cursor: pointer; border: 1px solid var(--border-color); }
@@ -242,35 +303,8 @@
 
     <div class="header" id="mainHeader">
         <div class="control-zone">
-            <div class="category-zone">
-                <select id="noteCategory" class="category-select">
-                    <option value="">-- 選擇分類 --</option>
-                </select>
-                <button class="btn-sm" onclick="editCategoryName()" title="修改目前選中的分類">改名</button>
-                <button class="btn-sm btn-clear" onclick="deleteCategoryName()" title="刪除目前選中的分類">刪除</button>
-                <input type="text" id="newCategoryInput" class="new-cat-input" placeholder="新分類名稱">
-                <button class="unified-btn" onclick="createCategory()">建立</button>
-            </div>
-
             <div class="row-mixed">
-                <button id="todoToggleBtn" class="unified-btn todo-toggle-btn" onclick="toggleTodoListMode()">☐</button>
-                <textarea id="noteContent" class="input-style" style="height:42px; resize:none;" placeholder="內容..." readonly onclick="openInputModal()" oninput="handleSuggest('content')"></textarea>
-            </div>
-
-            <!-- 圖片上傳區域：點雲朵圖示上傳至 Cloudinary，縮圖會顯示在旁邊 -->
-            <div class="row-mixed" id="imageUrlContainer" style="align-items: flex-start;">
-                <button type="button" class="img-url-btn" onclick="triggerCloudinaryUpload(this)" title="上傳圖片至 Cloudinary">☁️</button>
-                <div id="preview-area"></div>
-            </div>
-            <!-- 隱藏的 Cloudinary 上傳 Input -->
-            <input type="file" id="cloudinaryFileInput" style="display:none" accept="image/*" onchange="uploadToCloudinary(event)">
-
-            <div class="row-mixed">
-                <input type="text" id="noteKeywords" class="input-style input-sub" style="height: 32px;" placeholder="關鍵字" onkeydown="handleKeywordsKeydown(event)" oninput="handleSuggest('keywords')">
-                <button class="unified-btn" onclick="saveNote()">OK</button>
-            </div>
-            
-            <div class="row-mixed">
+                <button id="addNoteFab" class="add-note-fab" onclick="openInputModal()" title="新增筆記" aria-label="新增筆記">➕</button>
                 <select id="searchCategoryFilter" class="category-select" style="max-width: 130px;" onchange="onSearchInput()">
                     <option value="">全部分類</option>
                 </select>
@@ -295,10 +329,53 @@
 
     <div id="inputModal" class="modal">
         <div class="modal-content" style="max-width: 500px; width: 90%;">
-            <h3 style="margin:0 0 15px 0; font-size: 16px;">輸入內容</h3>
-            <textarea id="modalNoteContent" class="input-style" style="height:250px; margin-bottom:15px; resize:vertical;" placeholder="在此輸入大量資料..." onkeydown="handleModalContentKeydown(event)"></textarea>
-            <button class="unified-btn" style="width:100%; height: 38px;" onclick="closeInputModalWithSave()">確定</button>
-            <button style="width:100%; margin-top:10px; background:none; border:none; color:#999;" onclick="closeInputModalWithoutSave()">取消</button>
+            <div class="category-zone" style="margin-bottom:8px;">
+                <select id="noteCategory" class="category-select">
+                    <option value="">-- 選擇分類 --</option>
+                </select>
+                <button class="btn-sm" onclick="editCategoryName()" title="改名">✏️</button>
+                <button class="btn-sm btn-clear" onclick="deleteCategoryName()" title="刪除">🗑️</button>
+                <input type="text" id="newCategoryInput" class="new-cat-input" placeholder="新分類名稱">
+                <button class="unified-btn" onclick="createCategory()">建立</button>
+            </div>
+
+            <div class="reminder-row-scroll">
+                <div class="reminder-row-inner">
+                    <span class="reminder-label">⏰主要通知</span>
+                    <input type="datetime-local" id="inputRemindAt" class="reminder-datetime">
+                    <select id="inputRepeat" class="reminder-repeat">
+                        <option value="none">單次</option>
+                        <option value="daily">每天</option>
+                        <option value="weekly">每週</option>
+                        <option value="monthly">每月</option>
+                    </select>
+                    <span class="reminder-divider"></span>
+                    <span class="reminder-label">⏳提前通知</span>
+                    <input type="datetime-local" id="inputExtraRemindAt" class="reminder-datetime">
+                    <select id="inputExtraRepeat" class="reminder-repeat">
+                        <option value="none">單次</option>
+                        <option value="daily">每天</option>
+                        <option value="weekly">每週</option>
+                        <option value="monthly">每月</option>
+                    </select>
+                </div>
+            </div>
+
+            <button id="todoToggleBtn" class="unified-btn todo-toggle-btn" style="margin-bottom:8px;" onclick="toggleTodoListMode()">☐</button>
+
+            <textarea id="noteContent" class="input-style" style="height:200px; margin-bottom:10px; resize:vertical;" placeholder="輸入內容" onkeydown="handleContentKeydown(event)" oninput="handleSuggest('content')"></textarea>
+
+            <input type="text" id="noteKeywords" class="input-style" style="height: 32px; margin-bottom:8px;" placeholder="關鍵字" onkeydown="handleKeywordsKeydown(event)" oninput="handleSuggest('keywords')">
+            <div id="suggestionBox" class="suggestion-box"></div>
+
+            <div class="row-mixed" id="imageUrlContainer" style="align-items: flex-start; margin-bottom:14px;">
+                <button type="button" class="img-url-btn round" onclick="triggerCloudinaryUpload(this)" title="上傳圖片至 Cloudinary">☁️</button>
+                <div id="preview-area"></div>
+            </div>
+            <input type="file" id="cloudinaryFileInput" style="display:none" accept="image/*" onchange="uploadToCloudinary(event)">
+
+            <button class="unified-btn" style="width:100%; height: 38px;" onclick="saveNote()">OK</button>
+            <button style="width:100%; margin-top:10px; background:none; border:none; color:#999;" onclick="closeInputModalWithoutSave()">cancel</button>
         </div>
     </div>
 
@@ -306,7 +383,30 @@
         <div class="modal-content" style="max-width: 500px; width: 90%;">
             <h3 style="margin:0 0 15px 0; font-size: 16px;">修改紀錄</h3>
             <select id="editCategory" class="category-select" style="width: 100%; margin-bottom: 10px; max-width: none;"></select>
-            <textarea id="editContent" class="input-style" style="height:250px; margin-bottom:15px; resize:vertical;" onkeydown="handleEditContentKeydown(event)"></textarea>
+
+            <div class="reminder-row-scroll">
+                <div class="reminder-row-inner">
+                    <span class="reminder-label">⏰主要通知</span>
+                    <input type="datetime-local" id="editRemindAt" class="reminder-datetime">
+                    <select id="editRepeat" class="reminder-repeat">
+                        <option value="none">單次</option>
+                        <option value="daily">每天</option>
+                        <option value="weekly">每週</option>
+                        <option value="monthly">每月</option>
+                    </select>
+                    <span class="reminder-divider"></span>
+                    <span class="reminder-label">⏳提前通知</span>
+                    <input type="datetime-local" id="editExtraRemindAt" class="reminder-datetime">
+                    <select id="editExtraRepeat" class="reminder-repeat">
+                        <option value="none">單次</option>
+                        <option value="daily">每天</option>
+                        <option value="weekly">每週</option>
+                        <option value="monthly">每月</option>
+                    </select>
+                </div>
+            </div>
+
+            <textarea id="editContent" class="input-style" style="height:200px; margin-bottom:15px; resize:vertical;" onkeydown="handleEditContentKeydown(event)"></textarea>
             <div class="row-mixed" style="margin-bottom:10px">
                 <input type="text" id="editKeywords" class="input-style input-sub" style="height: 32px;" placeholder="關鍵字">
                 <button type="button" class="img-url-btn" onclick="triggerCloudinaryUploadEdit(this)" title="上傳圖片至 Cloudinary">☁️</button>
@@ -428,11 +528,12 @@
         function toggleTodoListMode() {
             const btn = document.getElementById('todoToggleBtn');
             const txtArea = document.getElementById('noteContent');
-            
+
             if (btn.innerText === '☐') {
                 btn.innerText = '☑';
                 txtArea.value = "【】";
-                openInputModal();
+                txtArea.focus();
+                txtArea.setSelectionRange(1, 1);
             } else {
                 btn.innerText = '☐';
                 txtArea.value = "";
@@ -440,31 +541,27 @@
         }
 
         function openInputModal() {
-            const mainContent = document.getElementById('noteContent').value;
-            const modalContent = document.getElementById('modalNoteContent');
-            modalContent.value = mainContent;
+            document.getElementById('noteContent').value = '';
+            document.getElementById('noteKeywords').value = '';
+            document.getElementById('noteCategory').value = '';
+            document.getElementById('inputRemindAt').value = '';
+            document.getElementById('inputRepeat').value = 'none';
+            document.getElementById('inputExtraRemindAt').value = '';
+            document.getElementById('inputExtraRepeat').value = 'none';
+            document.getElementById('todoToggleBtn').innerText = '☐';
+            tempImages = [];
+            document.getElementById('preview-area').innerHTML = '';
+            document.getElementById('suggestionBox').innerHTML = '';
             document.getElementById('inputModal').style.display = 'flex';
-            modalContent.focus();
-            
-            if (mainContent === "【】") {
-                modalContent.setSelectionRange(1, 1);
-            }
-        }
-
-        function closeInputModalWithSave() {
-            const modalContent = document.getElementById('modalNoteContent').value;
-            document.getElementById('noteContent').value = modalContent;
-            document.getElementById('inputModal').style.display = 'none';
-            handleSuggest('content');
-            document.getElementById('noteKeywords').focus();
+            document.getElementById('noteContent').focus();
         }
 
         function closeInputModalWithoutSave() {
             document.getElementById('inputModal').style.display = 'none';
         }
 
-        function handleModalContentKeydown(e) {
-            const txtArea = document.getElementById('modalNoteContent');
+        function handleContentKeydown(e) {
+            const txtArea = document.getElementById('noteContent');
             if (e.key === 'Enter') {
                 if (txtArea.value.includes('【') && txtArea.value.includes('】')) {
                     e.preventDefault();
@@ -958,19 +1055,31 @@
             const content = document.getElementById('noteContent').value;
             const keywords = document.getElementById('noteKeywords').value;
             const category = document.getElementById('noteCategory').value;
+            const remindAt = document.getElementById('inputRemindAt').value;
+            const repeat = document.getElementById('inputRepeat').value;
+            const extraRemindAt = document.getElementById('inputExtraRemindAt').value;
+            const extraRepeat = document.getElementById('inputExtraRepeat').value;
 
             const allImages = [...tempImages];
 
             if (!content && allImages.length === 0) return;
             const id = Date.now().toString();
-            db.child(id).set({ id, content, keywords, category, images: allImages, time: new Date().toLocaleString(), isPinned: false });
-            
+            const noteData = { id, content, keywords, category, images: allImages, time: new Date().toLocaleString(), isPinned: false, completed: false };
+            if (remindAt) { noteData.remindAt = remindAt; noteData.repeat = repeat; }
+            if (extraRemindAt) { noteData.extraRemindAt = extraRemindAt; noteData.extraRepeat = extraRepeat; }
+            db.child(id).set(noteData);
+
             document.getElementById('noteContent').value = '';
             document.getElementById('noteKeywords').value = '';
             document.getElementById('noteCategory').value = '';
+            document.getElementById('inputRemindAt').value = '';
+            document.getElementById('inputRepeat').value = 'none';
+            document.getElementById('inputExtraRemindAt').value = '';
+            document.getElementById('inputExtraRepeat').value = 'none';
             tempImages = [];
             document.getElementById('preview-area').innerHTML = '';
             document.getElementById('todoToggleBtn').innerText = '☐';
+            document.getElementById('inputModal').style.display = 'none';
         }
 
         function removeTempImage(idx) {
@@ -1116,16 +1225,29 @@
             document.getElementById('editContent').value = note.content;
             document.getElementById('editKeywords').value = note.keywords || '';
             document.getElementById('editCategory').value = note.category || '';
+            document.getElementById('editRemindAt').value = note.remindAt || '';
+            document.getElementById('editRepeat').value = note.repeat || 'none';
+            document.getElementById('editExtraRemindAt').value = note.extraRemindAt || '';
+            document.getElementById('editExtraRepeat').value = note.extraRepeat || 'none';
             updateEditPreview();
             document.getElementById('editModal').style.display = 'flex';
         }
         function updateNote() {
-            db.child(editingId).update({ 
+            const remindAt = document.getElementById('editRemindAt').value;
+            const repeat = document.getElementById('editRepeat').value;
+            const extraRemindAt = document.getElementById('editExtraRemindAt').value;
+            const extraRepeat = document.getElementById('editExtraRepeat').value;
+
+            db.child(editingId).update({
                 content: document.getElementById('editContent').value, 
                 keywords: document.getElementById('editKeywords').value,
                 category: document.getElementById('editCategory').value,
                 images: editImages,
-                time: new Date().toLocaleString() + ' (已修改)' 
+                time: new Date().toLocaleString() + ' (已修改)',
+                remindAt: remindAt || null,
+                repeat: remindAt ? repeat : null,
+                extraRemindAt: extraRemindAt || null,
+                extraRepeat: extraRemindAt ? extraRepeat : null
             });
             closeEditModal();
         }
