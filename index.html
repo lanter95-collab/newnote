@@ -193,14 +193,12 @@
             width: 90%;
             max-width: 500px;
             margin-top: 15px;
-            border: 1px solid var(--danger-color);
-            border-radius: 12px;
-            padding: 12px 15px;
-            background: var(--card-bg);
+            padding: 0 2px 12px 2px;
+            background: none;
         }
         .secretary-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
         .secretary-title { font-size: 14px; font-weight: 600; color: var(--text-color); }
-        .secretary-hide-btn { border: none; background: none; font-size: 12px; color: var(--text-secondary); cursor: pointer; }
+        .secretary-hide-btn { border: none; background: none; font-size: 15px; color: var(--text-secondary); cursor: pointer; }
         .secretary-item { position: relative; padding-bottom: 10px; margin-bottom: 10px; border-bottom: 1px dashed var(--border-color); }
         .secretary-item:last-of-type { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
         .secretary-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; padding-right: 20px; }
@@ -210,8 +208,11 @@
         .reminder-badge-tag { background: rgba(255,255,255,0.5); padding: 0 4px; border-radius: 3px; margin-left: 2px; font-size: 10px; }
         .secretary-content { font-size: 13px; color: var(--text-color); line-height: 1.5; }
         .secretary-delete { position: absolute; top: 0; right: 0; border: none; background: none; color: var(--text-secondary); font-size: 18px; cursor: pointer; line-height: 1; padding: 2px 4px; }
-        .secretary-collapse-btn { width: 100%; margin-top: 6px; height: 26px; border: none; background: none; font-size: 12px; color: var(--primary-color); cursor: pointer; }
-        .show-secretary-btn { width: 90%; max-width: 500px; margin-top: 15px; height: 32px; border: 1px dashed var(--border-color); border-radius: 8px; background: var(--card-bg); font-size: 12px; color: var(--text-secondary); display: none; }
+        .secretary-collapse-btn { width: 100%; margin-top: 6px; height: 26px; border: none; background: none; font-size: 14px; color: var(--primary-color); cursor: pointer; }
+        .show-secretary-btn { width: 90%; max-width: 500px; margin-top: 15px; height: 32px; border: 1px dashed var(--border-color); border-radius: 8px; background: var(--card-bg); font-size: 13px; color: var(--text-secondary); display: none; }
+        .secretary-divider { width: 90%; max-width: 500px; height: 1px; background: var(--border-color); margin: 15px auto 0 auto; display: none; }
+
+
 
         .search-bar { background: var(--input-bg); border-color: var(--border-color); width: 100%; }
         .suggestion-box { width: 100%; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; min-height: 0; }
@@ -356,12 +357,13 @@
 
     <div id="secretarySection" class="secretary-section" style="display:none;">
         <div class="secretary-header">
-            <span class="secretary-title">個人秘書</span>
-            <button class="secretary-hide-btn" onclick="toggleSecretaryHidden()">隱藏 ▾</button>
+            <span class="secretary-title">Secretary</span>
+            <button class="secretary-hide-btn" onclick="toggleSecretaryHidden()" title="隱藏">🙈</button>
         </div>
         <div id="secretaryList"></div>
     </div>
-    <button id="showSecretaryBtn" class="show-secretary-btn" onclick="toggleSecretaryHidden()">⏰ 顯示個人秘書</button>
+    <div id="secretaryDivider" class="secretary-divider"></div>
+    <button id="showSecretaryBtn" class="show-secretary-btn" onclick="toggleSecretaryHidden()">👀 Secretary</button>
 
     <div id="note-container"></div>
     
@@ -731,29 +733,33 @@
             const section = document.getElementById('secretarySection');
             const showBtn = document.getElementById('showSecretaryBtn');
             const listEl = document.getElementById('secretaryList');
+            const divider = document.getElementById('secretaryDivider');
             const items = getSecretaryNotes();
 
             if (items.length === 0) {
                 section.style.display = 'none';
                 showBtn.style.display = 'none';
+                divider.style.display = 'none';
                 return;
             }
 
             if (secretaryHidden) {
                 section.style.display = 'none';
                 showBtn.style.display = 'block';
+                divider.style.display = 'none';
                 return;
             }
 
             section.style.display = 'block';
             showBtn.style.display = 'none';
+            divider.style.display = 'block';
 
             const displayItems = secretaryExpanded ? items : items.slice(0, 1);
             let html = displayItems.map(buildSecretaryItemHtml).join('');
             if (items.length > 1) {
                 html += secretaryExpanded
-                    ? `<button class="secretary-collapse-btn" onclick="toggleSecretaryExpand()">收合 ▴</button>`
-                    : `<button class="secretary-collapse-btn" onclick="toggleSecretaryExpand()">展開全部（共 ${items.length} 筆）▾</button>`;
+                    ? `<button class="secretary-collapse-btn" onclick="toggleSecretaryExpand()">🔼</button>`
+                    : `<button class="secretary-collapse-btn" onclick="toggleSecretaryExpand()">展開全部（共 ${items.length} 筆）🔽</button>`;
             }
             listEl.innerHTML = html;
         }
@@ -1079,7 +1085,7 @@
                     ${catHtml}
                     <div class="note-text collapsed" id="text-${note.id}">${finalBodyHtml}</div>
                     ${linkResult.ytHtml}
-                    <div class="toggle-text-btn" id="toggle-btn-${note.id}" onclick="event.stopPropagation(); toggleText('${note.id}')">閱讀全文</div>
+                    <div class="toggle-text-btn" id="toggle-btn-${note.id}" onclick="event.stopPropagation(); toggleText('${note.id}')">🔽</div>
                     <div class="tag-list">${tagsHtml}</div>
                     <div class="image-gallery">${imgsHtml}</div>
                     ${relatedHtml}
@@ -1118,9 +1124,9 @@
                     btnEl.style.display = 'block';
                     if (expandedNoteIds.has(id)) {
                         textEl.classList.remove('collapsed');
-                        btnEl.innerText = '收合全文';
+                        btnEl.innerText = '🔼';
                     } else {
-                        btnEl.innerText = '閱讀全文';
+                        btnEl.innerText = '🔽';
                     }
                 } else {
                     textEl.classList.remove('collapsed');
@@ -1135,11 +1141,11 @@
             if (textEl && btnEl) {
                 if (textEl.classList.contains('collapsed')) {
                     textEl.classList.remove('collapsed');
-                    btnEl.innerText = '收合全文';
+                    btnEl.innerText = '🔼';
                     expandedNoteIds.add(id);
                 } else {
                     textEl.classList.add('collapsed');
-                    btnEl.innerText = '閱讀全文';
+                    btnEl.innerText = '🔽';
                     expandedNoteIds.delete(id);
                     document.getElementById(`note-${id}`).scrollIntoView({ behavior: 'auto', block: 'nearest' });
                 }
