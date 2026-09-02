@@ -27,6 +27,10 @@
             --related-border: #dddddd;
             --shadow-color: rgba(0,0,0,0.05);
             --header-bg: white;
+            --reminder-main-bg: #ffe5e5;
+            --reminder-main-text: #d9364a;
+            --reminder-extra-bg: #fff3d6;
+            --reminder-extra-text: #a97a00;
         }
 
         /* 🌙 自動跟隨手機系統：當手機開啟夜間模式時，自動啟用以下深色參數 */
@@ -47,6 +51,10 @@
                 --related-border: #48484a;
                 --shadow-color: rgba(0,0,0,0.3);
                 --header-bg: #1c1c1e;        /* 上方控制區變深 */
+                --reminder-main-bg: #4a1f24;
+                --reminder-main-text: #ff6b81;
+                --reminder-extra-bg: #4a3c1a;
+                --reminder-extra-text: #ffd166;
             }
             /* 夜間模式下微調細節 */
             .btn-sm { background: #3a3a3c !important; color: #fff !important; border-color: #48484a !important; }
@@ -179,6 +187,31 @@
             flex-shrink: 0;
         }
         .reminder-divider { width: 1px; height: 20px; background: var(--border-color); margin: 0 4px; flex-shrink: 0; }
+
+        /* 個人秘書區塊 */
+        .secretary-section {
+            width: 90%;
+            max-width: 500px;
+            margin-top: 15px;
+            border: 1px solid var(--danger-color);
+            border-radius: 12px;
+            padding: 12px 15px;
+            background: var(--card-bg);
+        }
+        .secretary-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+        .secretary-title { font-size: 14px; font-weight: 600; color: var(--text-color); }
+        .secretary-hide-btn { border: none; background: none; font-size: 12px; color: var(--text-secondary); cursor: pointer; }
+        .secretary-item { position: relative; padding-bottom: 10px; margin-bottom: 10px; border-bottom: 1px dashed var(--border-color); }
+        .secretary-item:last-of-type { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        .secretary-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; padding-right: 20px; }
+        .reminder-badge { font-size: 11px; padding: 2px 8px; border-radius: 5px; display: inline-flex; align-items: center; gap: 4px; }
+        .reminder-badge.main { background: var(--reminder-main-bg); color: var(--reminder-main-text); }
+        .reminder-badge.extra { background: var(--reminder-extra-bg); color: var(--reminder-extra-text); }
+        .reminder-badge-tag { background: rgba(255,255,255,0.5); padding: 0 4px; border-radius: 3px; margin-left: 2px; font-size: 10px; }
+        .secretary-content { font-size: 13px; color: var(--text-color); line-height: 1.5; }
+        .secretary-delete { position: absolute; top: 0; right: 0; border: none; background: none; color: var(--text-secondary); font-size: 18px; cursor: pointer; line-height: 1; padding: 2px 4px; }
+        .secretary-collapse-btn { width: 100%; margin-top: 6px; height: 26px; border: none; background: none; font-size: 12px; color: var(--primary-color); cursor: pointer; }
+        .show-secretary-btn { width: 90%; max-width: 500px; margin-top: 15px; height: 32px; border: 1px dashed var(--border-color); border-radius: 8px; background: var(--card-bg); font-size: 12px; color: var(--text-secondary); display: none; }
 
         .search-bar { background: var(--input-bg); border-color: var(--border-color); width: 100%; }
         .suggestion-box { width: 100%; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; min-height: 0; }
@@ -320,6 +353,15 @@
             <input type="file" id="importFile" style="display:none" accept=".json" onchange="importJSON(event)">
         </div>
     </div>
+
+    <div id="secretarySection" class="secretary-section" style="display:none;">
+        <div class="secretary-header">
+            <span class="secretary-title">個人秘書</span>
+            <button class="secretary-hide-btn" onclick="toggleSecretaryHidden()">隱藏 ▾</button>
+        </div>
+        <div id="secretaryList"></div>
+    </div>
+    <button id="showSecretaryBtn" class="show-secretary-btn" onclick="toggleSecretaryHidden()">⏰ 顯示個人秘書</button>
 
     <div id="note-container"></div>
     
@@ -623,8 +665,9 @@
                 });
             }
 
-            document.getElementById('noteCountDisplay').innerText = `目前共有 ${notes.length} 筆記錄`;
+            document.getElementById('noteCountDisplay').innerText = `目前共有 ${notes.filter(n => !isReminderNote(n)).length} 筆記錄`;
             renderCategorySelects();
+            renderSecretaryList();
             onSearchInput(); 
         });
 
@@ -637,6 +680,93 @@
             }).catch(err => {
                 alert('無法自動複製，請手動複製此網址：' + shareUrl);
             });
+        }
+
+        // ===== 個人秘書（提醒清單）相關 =====
+        let secretaryExpanded = false;
+        let secretaryHidden = localStorage.getItem('secretaryHidden') === 'true';
+
+        function isReminderNote(n) {
+            return !!(n.remindAt || n.extraRemindAt);
+        }
+
+        function getSecretaryNotes() {
+            return notes.filter(isReminderNote).sort((a, b) => {
+                const aTime = new Date(a.remindAt || a.extraRemindAt).getTime();
+                const bTime = new Date(b.remindAt || b.extraRemindAt).getTime();
+                return aTime - bTime;
+            });
+        }
+
+        function formatReminderBadge(iso, repeat) {
+            if (!iso) return '';
+            const d = new Date(iso);
+            if (isNaN(d.getTime())) return '';
+            const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
+            const mm = d.getMonth() + 1;
+            const dd = d.getDate();
+            const hh = String(d.getHours()).padStart(2, '0');
+            const mi = String(d.getMinutes()).padStart(2, '0');
+            const wd = weekDays[d.getDay()];
+            const repeatMap = { daily: '每天', weekly: '每週', monthly: '每月' };
+            const repeatLabel = repeatMap[repeat] || '';
+            return `${mm}/${dd}(${wd}) ${hh}:${mi}${repeatLabel ? `<span class="reminder-badge-tag">${repeatLabel}</span>` : ''}`;
+        }
+
+        function buildSecretaryItemHtml(note) {
+            const highlightedContent = highlightText(note.content, '');
+            const linkResult = processContentLinks(highlightedContent);
+            const finalBodyHtml = parseTodoListHtml(linkResult.html, note.id);
+            const mainBadge = note.remindAt ? `<span class="reminder-badge main">⏰ ${formatReminderBadge(note.remindAt, note.repeat)}</span>` : '';
+            const extraBadge = note.extraRemindAt ? `<span class="reminder-badge extra">⏳ ${formatReminderBadge(note.extraRemindAt, note.extraRepeat)}</span>` : '';
+            return `
+                <div class="secretary-item" ondblclick="openEditModal('${note.id}')">
+                    <button class="secretary-delete" onclick="event.stopPropagation(); deleteNote('${note.id}')" title="刪除">×</button>
+                    <div class="secretary-badges">${mainBadge}${extraBadge}</div>
+                    <div class="secretary-content">${finalBodyHtml}</div>
+                </div>`;
+        }
+
+        function renderSecretaryList() {
+            const section = document.getElementById('secretarySection');
+            const showBtn = document.getElementById('showSecretaryBtn');
+            const listEl = document.getElementById('secretaryList');
+            const items = getSecretaryNotes();
+
+            if (items.length === 0) {
+                section.style.display = 'none';
+                showBtn.style.display = 'none';
+                return;
+            }
+
+            if (secretaryHidden) {
+                section.style.display = 'none';
+                showBtn.style.display = 'block';
+                return;
+            }
+
+            section.style.display = 'block';
+            showBtn.style.display = 'none';
+
+            const displayItems = secretaryExpanded ? items : items.slice(0, 1);
+            let html = displayItems.map(buildSecretaryItemHtml).join('');
+            if (items.length > 1) {
+                html += secretaryExpanded
+                    ? `<button class="secretary-collapse-btn" onclick="toggleSecretaryExpand()">收合 ▴</button>`
+                    : `<button class="secretary-collapse-btn" onclick="toggleSecretaryExpand()">展開全部（共 ${items.length} 筆）▾</button>`;
+            }
+            listEl.innerHTML = html;
+        }
+
+        function toggleSecretaryExpand() {
+            secretaryExpanded = !secretaryExpanded;
+            renderSecretaryList();
+        }
+
+        function toggleSecretaryHidden() {
+            secretaryHidden = !secretaryHidden;
+            localStorage.setItem('secretaryHidden', secretaryHidden ? 'true' : 'false');
+            renderSecretaryList();
         }
 
         function renderCategorySelects() {
@@ -755,6 +885,7 @@
             activeCategoryFilter = searchSelectVal;
 
             filteredNotes = notes.filter(n => {
+                if (isReminderNote(n)) return false;
                 if (searchSelectVal && n.category !== searchSelectVal) return false;
                 if (searchTerms.length === 0) return true;
                 const fullText = (n.content + ' ' + (n.keywords || '') + ' ' + (n.category || '')).toLowerCase();
