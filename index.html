@@ -212,6 +212,15 @@
         .show-secretary-btn { width: 90%; max-width: 500px; margin-top: 15px; height: 32px; border: 1px dashed var(--border-color); border-radius: 8px; background: var(--card-bg); font-size: 13px; color: var(--text-secondary); display: none; }
         .secretary-divider { width: 90%; max-width: 500px; height: 1px; background: var(--border-color); margin: 15px auto 0 auto; display: none; }
 
+        /* 頂部背景圖片 */
+        #mainHeader { position: relative; background-size: cover; background-repeat: no-repeat; }
+        .header-bg-controls { position: absolute; top: 6px; right: 6px; display: flex; gap: 6px; z-index: 5; }
+        .header-bg-btn { width: 26px; height: 26px; border-radius: 50%; border: 0.5px solid var(--border-color); background: var(--card-bg); font-size: 13px; cursor: pointer; opacity: 0.9; display: flex; align-items: center; justify-content: center; padding: 0; }
+        .header-bg-adjust-bar { width: 90%; max-width: 500px; margin: 10px auto 0 auto; display: flex; align-items: center; justify-content: center; gap: 10px; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 20px; padding: 6px 14px; font-size: 12px; color: var(--text-secondary); }
+        .header-bg-adjust-bar button { border: none; background: none; font-size: 16px; cursor: pointer; }
+        #mainHeader.bg-adjust-mode { cursor: grab; user-select: none; }
+        #mainHeader.bg-adjust-mode:active { cursor: grabbing; }
+
 
 
         .search-bar { background: var(--input-bg); border-color: var(--border-color); width: 100%; }
@@ -336,28 +345,37 @@
 <body>
 
     <div class="header" id="mainHeader">
+        <div class="header-bg-controls">
+            <button id="headerBgBtn" class="header-bg-btn" onclick="triggerHeaderBgUpload()" title="上傳背景圖片">🖼️</button>
+            <button id="headerBgAdjustBtn" class="header-bg-btn" onclick="enterHeaderBgAdjustMode()" title="調整位置" style="display:none;">🎯</button>
+            <button id="headerBgRemoveBtn" class="header-bg-btn" onclick="removeHeaderBg()" title="移除背景圖片" style="display:none;">🗑️</button>
+        </div>
         <div class="control-zone">
             <div class="row-mixed">
-                <button id="addNoteFab" class="add-note-fab" onclick="openInputModal()" title="新增筆記" aria-label="新增筆記">➕</button>
                 <select id="searchCategoryFilter" class="category-select" style="max-width: 130px;" onchange="onSearchInput()">
                     <option value="">全部分類</option>
                 </select>
                 <input type="text" id="searchInput" class="input-style search-bar" style="height: 32px;" placeholder="搜尋..." oninput="onSearchInput()">
+                <button id="addNoteFab" class="add-note-fab" onclick="openInputModal()" title="新增筆記" aria-label="新增筆記">➕</button>
             </div>
-            <div id="suggestionBox" class="suggestion-box"></div>
         </div>
         <div class="tool-bar">
             <button class="btn-sm" onclick="exportJSON()">儲存</button>
             <button class="btn-sm" onclick="document.getElementById('importFile').click()">讀取</button>
             <button class="btn-sm btn-clear" onclick="clearAll()">清空</button>
-            <span id="noteCountDisplay" class="info-bar-count">目前共有 0 筆記錄</span>
+            <span id="noteCountDisplay" class="info-bar-count">0 notes</span>
             <input type="file" id="importFile" style="display:none" accept=".json" onchange="importJSON(event)">
         </div>
     </div>
+    <div id="headerBgAdjustBar" class="header-bg-adjust-bar" style="display:none;">
+        <span>🖐️ 拖曳圖片調整位置</span>
+        <button onclick="confirmHeaderBgAdjust()" title="確認">✅</button>
+    </div>
+    <input type="file" id="headerBgFileInput" style="display:none" accept="image/*" onchange="uploadHeaderBgImage(event)">
 
     <div id="secretarySection" class="secretary-section" style="display:none;">
         <div class="secretary-header">
-            <span class="secretary-title">Secretary</span>
+            <span class="secretary-title" id="secretaryTitle">Secretary</span>
             <button class="secretary-hide-btn" onclick="toggleSecretaryHidden()" title="隱藏">🙈</button>
         </div>
         <div id="secretaryList"></div>
@@ -374,7 +392,7 @@
     <div id="inputModal" class="modal">
         <div class="modal-content" style="max-width: 500px; width: 90%;">
             <div class="category-zone" style="margin-bottom:8px;">
-                <select id="noteCategory" class="category-select">
+                <select id="noteCategory" class="category-select" onchange="updateInputCategoryMode()">
                     <option value="">-- 選擇分類 --</option>
                 </select>
                 <button class="btn-sm" onclick="editCategoryName()" title="改名">✏️</button>
@@ -409,12 +427,14 @@
 
             <textarea id="noteContent" class="input-style" style="height:200px; margin-bottom:10px; resize:vertical;" placeholder="輸入內容" onkeydown="handleContentKeydown(event)" oninput="handleSuggest('content')"></textarea>
 
-            <input type="text" id="noteKeywords" class="input-style" style="height: 32px; margin-bottom:8px;" placeholder="關鍵字" onkeydown="handleKeywordsKeydown(event)" oninput="handleSuggest('keywords')">
-            <div id="suggestionBox" class="suggestion-box"></div>
+            <div id="inputExtraFieldsWrapper">
+                <input type="text" id="noteKeywords" class="input-style" style="height: 32px; margin-bottom:8px;" placeholder="關鍵字" onkeydown="handleKeywordsKeydown(event)" oninput="handleSuggest('keywords')">
+                <div id="suggestionBox" class="suggestion-box"></div>
 
-            <div class="row-mixed" id="imageUrlContainer" style="align-items: flex-start; margin-bottom:14px;">
-                <button type="button" class="img-url-btn round" onclick="triggerCloudinaryUpload(this)" title="上傳圖片至 Cloudinary">☁️</button>
-                <div id="preview-area"></div>
+                <div class="row-mixed" id="imageUrlContainer" style="align-items: flex-start; margin-bottom:14px;">
+                    <button type="button" class="img-url-btn round" onclick="triggerCloudinaryUpload(this)" title="上傳圖片至 Cloudinary">☁️</button>
+                    <div id="preview-area"></div>
+                </div>
             </div>
             <input type="file" id="cloudinaryFileInput" style="display:none" accept="image/*" onchange="uploadToCloudinary(event)">
 
@@ -426,7 +446,7 @@
     <div id="editModal" class="modal">
         <div class="modal-content" style="max-width: 500px; width: 90%;">
             <h3 style="margin:0 0 15px 0; font-size: 16px;">修改紀錄</h3>
-            <select id="editCategory" class="category-select" style="width: 100%; margin-bottom: 10px; max-width: none;"></select>
+            <select id="editCategory" class="category-select" style="width: 100%; margin-bottom: 10px; max-width: none;" onchange="updateEditCategoryMode()"></select>
 
             <div class="reminder-row-scroll">
                 <div class="reminder-row-inner">
@@ -451,7 +471,7 @@
             </div>
 
             <textarea id="editContent" class="input-style" style="height:200px; margin-bottom:15px; resize:vertical;" onkeydown="handleEditContentKeydown(event)"></textarea>
-            <div class="row-mixed" style="margin-bottom:10px">
+            <div class="row-mixed" id="editExtraFieldsWrapper" style="margin-bottom:10px">
                 <input type="text" id="editKeywords" class="input-style input-sub" style="height: 32px;" placeholder="關鍵字">
                 <button type="button" class="img-url-btn" onclick="triggerCloudinaryUploadEdit(this)" title="上傳圖片至 Cloudinary">☁️</button>
                 <div id="edit-preview-area"></div>
@@ -480,6 +500,7 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database().ref('notes');
         const dbCat = firebase.database().ref('categories');
+        const dbSettings = firebase.database().ref('settings');
 
         let notes = [];
         let filteredNotes = []; 
@@ -569,6 +590,131 @@
             }
         }
 
+        // ===== 頂部背景圖片相關 =====
+        let headerBgAdjusting = false;
+        let headerBgPos = { x: 50, y: 50 };
+        let headerBgDragging = false;
+        let headerBgDragStart = { x: 0, y: 0 };
+        let headerBgDragStartPos = { x: 50, y: 50 };
+
+        function triggerHeaderBgUpload() {
+            document.getElementById('headerBgFileInput').click();
+        }
+
+        async function uploadHeaderBgImage(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const cloudName = 'keloftva';
+            const uploadPreset = 'ml_default';
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('upload_preset', uploadPreset);
+
+            try {
+                const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                if (result.secure_url) {
+                    headerBgPos = { x: 50, y: 50 };
+                    applyHeaderBg(result.secure_url, headerBgPos);
+                    enterHeaderBgAdjustMode();
+                } else {
+                    alert('上傳失敗：' + (result.error ? result.error.message : '未知錯誤'));
+                }
+            } catch (err) {
+                alert('上傳發生錯誤：' + err.message);
+            } finally {
+                e.target.value = '';
+            }
+        }
+
+        function applyHeaderBg(url, pos) {
+            const header = document.getElementById('mainHeader');
+            header.style.backgroundImage = `url('${url}')`;
+            header.style.backgroundPosition = `${pos.x}% ${pos.y}%`;
+            document.getElementById('headerBgAdjustBtn').style.display = 'flex';
+            document.getElementById('headerBgRemoveBtn').style.display = 'flex';
+        }
+
+        function enterHeaderBgAdjustMode() {
+            const header = document.getElementById('mainHeader');
+            if (!header.style.backgroundImage || header.style.backgroundImage === 'none') return;
+            headerBgAdjusting = true;
+            header.classList.add('bg-adjust-mode');
+            document.getElementById('headerBgAdjustBar').style.display = 'flex';
+        }
+
+        function confirmHeaderBgAdjust() {
+            const header = document.getElementById('mainHeader');
+            headerBgAdjusting = false;
+            header.classList.remove('bg-adjust-mode');
+            document.getElementById('headerBgAdjustBar').style.display = 'none';
+            const urlMatch = header.style.backgroundImage.match(/url\(['"]?(.*?)['"]?\)/);
+            const url = urlMatch ? urlMatch[1] : '';
+            if (url) {
+                dbSettings.child('headerBg').set({ url, x: headerBgPos.x, y: headerBgPos.y });
+            }
+        }
+
+        function removeHeaderBg() {
+            if (!confirm('確定移除背景圖片？')) return;
+            const header = document.getElementById('mainHeader');
+            header.style.backgroundImage = 'none';
+            document.getElementById('headerBgAdjustBtn').style.display = 'none';
+            document.getElementById('headerBgRemoveBtn').style.display = 'none';
+            document.getElementById('headerBgAdjustBar').style.display = 'none';
+            headerBgAdjusting = false;
+            header.classList.remove('bg-adjust-mode');
+            dbSettings.child('headerBg').remove();
+        }
+
+        function initHeaderBgDrag() {
+            const header = document.getElementById('mainHeader');
+
+            function onDown(clientX, clientY) {
+                if (!headerBgAdjusting) return;
+                headerBgDragging = true;
+                headerBgDragStart = { x: clientX, y: clientY };
+                headerBgDragStartPos = { ...headerBgPos };
+            }
+            function onMove(clientX, clientY) {
+                if (!headerBgDragging) return;
+                const rect = header.getBoundingClientRect();
+                const dxPercent = ((clientX - headerBgDragStart.x) / rect.width) * 100;
+                const dyPercent = ((clientY - headerBgDragStart.y) / rect.height) * 100;
+                let newX = headerBgDragStartPos.x - dxPercent;
+                let newY = headerBgDragStartPos.y - dyPercent;
+                newX = Math.max(0, Math.min(100, newX));
+                newY = Math.max(0, Math.min(100, newY));
+                headerBgPos = { x: newX, y: newY };
+                header.style.backgroundPosition = `${newX}% ${newY}%`;
+            }
+            function onUp() { headerBgDragging = false; }
+
+            header.addEventListener('mousedown', (e) => { if (headerBgAdjusting) { e.preventDefault(); onDown(e.clientX, e.clientY); } });
+            window.addEventListener('mousemove', (e) => onMove(e.clientX, e.clientY));
+            window.addEventListener('mouseup', onUp);
+
+            header.addEventListener('touchstart', (e) => { if (headerBgAdjusting) { const t = e.touches[0]; onDown(t.clientX, t.clientY); } }, { passive: true });
+            header.addEventListener('touchmove', (e) => { if (headerBgDragging) { const t = e.touches[0]; onMove(t.clientX, t.clientY); } }, { passive: true });
+            header.addEventListener('touchend', onUp);
+        }
+
+        function loadHeaderBgFromSettings() {
+            dbSettings.child('headerBg').once('value').then(snap => {
+                const data = snap.val();
+                if (data && data.url) {
+                    headerBgPos = { x: data.x != null ? data.x : 50, y: data.y != null ? data.y : 50 };
+                    applyHeaderBg(data.url, headerBgPos);
+                }
+            });
+        }
+
+        initHeaderBgDrag();
+        loadHeaderBgFromSettings();
+
         function toggleTodoListMode() {
             const btn = document.getElementById('todoToggleBtn');
             const txtArea = document.getElementById('noteContent');
@@ -584,6 +730,21 @@
             }
         }
 
+        function updateInputCategoryMode() {
+            const isSecretary = document.getElementById('noteCategory').value === 'Secretary';
+            const wrapper = document.getElementById('inputExtraFieldsWrapper');
+            wrapper.style.display = isSecretary ? 'none' : 'block';
+            if (isSecretary) {
+                document.getElementById('noteKeywords').value = '';
+                document.getElementById('suggestionBox').innerHTML = '';
+            }
+        }
+
+        function updateEditCategoryMode() {
+            const isSecretary = document.getElementById('editCategory').value === 'Secretary';
+            document.getElementById('editExtraFieldsWrapper').style.display = isSecretary ? 'none' : 'flex';
+        }
+
         function openInputModal() {
             document.getElementById('noteContent').value = '';
             document.getElementById('noteKeywords').value = '';
@@ -596,6 +757,7 @@
             tempImages = [];
             document.getElementById('preview-area').innerHTML = '';
             document.getElementById('suggestionBox').innerHTML = '';
+            updateInputCategoryMode();
             document.getElementById('inputModal').style.display = 'flex';
             document.getElementById('noteContent').focus();
         }
@@ -667,7 +829,8 @@
                 });
             }
 
-            document.getElementById('noteCountDisplay').innerText = `目前共有 ${notes.filter(n => !isReminderNote(n)).length} 筆記錄`;
+            const cloudNoteCount = notes.filter(n => !isReminderNote(n)).length;
+            document.getElementById('noteCountDisplay').innerText = `${cloudNoteCount} ${cloudNoteCount === 1 ? 'note' : 'notes'}`;
             renderCategorySelects();
             renderSecretaryList();
             onSearchInput(); 
@@ -734,6 +897,7 @@
             const showBtn = document.getElementById('showSecretaryBtn');
             const listEl = document.getElementById('secretaryList');
             const divider = document.getElementById('secretaryDivider');
+            const titleEl = document.getElementById('secretaryTitle');
             const items = getSecretaryNotes();
 
             if (items.length === 0) {
@@ -742,6 +906,8 @@
                 divider.style.display = 'none';
                 return;
             }
+
+            titleEl.innerText = `Secretary - ${items.length} ${items.length === 1 ? 'memo' : 'memos'}`;
 
             if (secretaryHidden) {
                 section.style.display = 'none';
@@ -759,7 +925,7 @@
             if (items.length > 1) {
                 html += secretaryExpanded
                     ? `<button class="secretary-collapse-btn" onclick="toggleSecretaryExpand()">🔼</button>`
-                    : `<button class="secretary-collapse-btn" onclick="toggleSecretaryExpand()">展開全部（共 ${items.length} 筆）🔽</button>`;
+                    : `<button class="secretary-collapse-btn" onclick="toggleSecretaryExpand()">🔽</button>`;
             }
             listEl.innerHTML = html;
         }
@@ -791,7 +957,7 @@
                 return a.name.localeCompare(b.name, 'zh-Hant-TW');
             });
             
-            let optionsHtml = '<option value="">-- 選擇分類 --</option>';
+            let optionsHtml = '<option value="">-- 選擇分類 --</option><option value="Secretary">Secretary</option>';
             let searchOptionsHtml = '<option value="">全部分類</option>';
             
             sortedCategories.forEach(cat => {
@@ -1175,6 +1341,7 @@
         }
 
         function handleSuggest(type) {
+            if (document.getElementById('noteCategory').value === 'Secretary') return;
             const content = document.getElementById('noteContent').value;
             const kwInput = document.getElementById('noteKeywords');
             const box = document.getElementById('suggestionBox');
@@ -1367,6 +1534,7 @@
             document.getElementById('editExtraRemindAt').value = note.extraRemindAt || '';
             document.getElementById('editExtraRepeat').value = note.extraRepeat || 'none';
             updateEditPreview();
+            updateEditCategoryMode();
             document.getElementById('editModal').style.display = 'flex';
         }
         function updateNote() {
