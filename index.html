@@ -129,19 +129,20 @@
 
         /* 新增筆記的圓形浮動按鈕 */
         .add-note-fab {
-            width: 36px;
-            height: 36px;
+            width: 30px;
+            height: 30px;
             flex-shrink: 0;
             border: none;
             border-radius: 50%;
             background: var(--primary-color);
             color: #fff;
-            font-size: 16px;
+            font-size: 14px;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
             padding: 0;
+            margin-right: 30px;
         }
         .add-note-fab:active { opacity: 0.7; }
 
@@ -214,8 +215,11 @@
 
         /* 頂部背景圖片 */
         #mainHeader { position: relative; background-size: cover; background-repeat: no-repeat; }
-        .header-bg-controls { position: absolute; top: 6px; right: 6px; display: flex; gap: 6px; z-index: 5; }
-        .header-bg-btn { width: 26px; height: 26px; border-radius: 50%; border: 0.5px solid var(--border-color); background: var(--card-bg); font-size: 13px; cursor: pointer; opacity: 0.9; display: flex; align-items: center; justify-content: center; padding: 0; }
+        .header-bg-controls { position: absolute; top: 6px; right: 6px; z-index: 6; }
+        .header-bg-btn { width: 22px; height: 22px; border-radius: 50%; border: 0.5px solid var(--border-color); background: var(--card-bg); font-size: 12px; cursor: pointer; opacity: 0.9; display: flex; align-items: center; justify-content: center; padding: 0; line-height: 1; }
+        .header-bg-menu-panel { position: absolute; top: 26px; right: 0; display: flex; flex-direction: column; gap: 2px; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.25); z-index: 6; }
+        .header-bg-menu-panel button { white-space: nowrap; border: none; background: none; font-size: 12px; color: var(--text-color); text-align: left; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
+        .header-bg-menu-panel button:active { background: var(--input-bg); }
         .header-bg-adjust-bar { width: 90%; max-width: 500px; margin: 10px auto 0 auto; display: flex; align-items: center; justify-content: center; gap: 10px; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 20px; padding: 6px 14px; font-size: 12px; color: var(--text-secondary); }
         .header-bg-adjust-bar button { border: none; background: none; font-size: 16px; cursor: pointer; }
         #mainHeader.bg-adjust-mode { cursor: grab; user-select: none; }
@@ -346,9 +350,12 @@
 
     <div class="header" id="mainHeader">
         <div class="header-bg-controls">
-            <button id="headerBgBtn" class="header-bg-btn" onclick="triggerHeaderBgUpload()" title="上傳背景圖片">🖼️</button>
-            <button id="headerBgAdjustBtn" class="header-bg-btn" onclick="enterHeaderBgAdjustMode()" title="調整位置" style="display:none;">🎯</button>
-            <button id="headerBgRemoveBtn" class="header-bg-btn" onclick="removeHeaderBg()" title="移除背景圖片" style="display:none;">🗑️</button>
+            <button id="headerBgMenuBtn" class="header-bg-btn" onclick="toggleHeaderBgMenu()" title="背景圖片設定">⋯</button>
+            <div id="headerBgMenuPanel" class="header-bg-menu-panel" style="display:none;">
+                <button onclick="triggerHeaderBgUpload(); toggleHeaderBgMenu(false);">🖼️ 上傳背景圖片</button>
+                <button id="headerBgAdjustBtn" style="display:none;" onclick="enterHeaderBgAdjustMode(); toggleHeaderBgMenu(false);">🎯 調整位置</button>
+                <button id="headerBgRemoveBtn" style="display:none;" onclick="removeHeaderBg(); toggleHeaderBgMenu(false);">🗑️ 移除背景圖片</button>
+            </div>
         </div>
         <div class="control-zone">
             <div class="row-mixed">
@@ -596,6 +603,20 @@
         let headerBgDragging = false;
         let headerBgDragStart = { x: 0, y: 0 };
         let headerBgDragStartPos = { x: 50, y: 50 };
+
+        function toggleHeaderBgMenu(forceState) {
+            const panel = document.getElementById('headerBgMenuPanel');
+            const isOpen = panel.style.display === 'flex';
+            const nextState = (forceState !== undefined) ? forceState : !isOpen;
+            panel.style.display = nextState ? 'flex' : 'none';
+        }
+        document.addEventListener('click', function(e) {
+            const panel = document.getElementById('headerBgMenuPanel');
+            const menuBtn = document.getElementById('headerBgMenuBtn');
+            if (panel && panel.style.display === 'flex' && !panel.contains(e.target) && e.target !== menuBtn) {
+                panel.style.display = 'none';
+            }
+        });
 
         function triggerHeaderBgUpload() {
             document.getElementById('headerBgFileInput').click();
