@@ -368,9 +368,9 @@
             </div>
         </div>
         <div class="tool-bar">
-            <button class="btn-sm" onclick="exportJSON()">儲存</button>
-            <button class="btn-sm" onclick="document.getElementById('importFile').click()">讀取</button>
-            <button class="btn-sm btn-clear" onclick="clearAll()">清空</button>
+            <button class="btn-sm" onclick="exportJSON()">Save</button>
+            <button class="btn-sm" onclick="document.getElementById('importFile').click()">Load</button>
+            <button class="btn-sm btn-clear" onclick="clearAll()">Clear</button>
             <span id="noteCountDisplay" class="info-bar-count">0 notes</span>
             <input type="file" id="importFile" style="display:none" accept=".json" onchange="importJSON(event)">
         </div>
@@ -406,7 +406,7 @@
                 <button class="btn-sm" onclick="editCategoryName()" title="改名">✏️</button>
                 <button class="btn-sm btn-clear" onclick="deleteCategoryName()" title="刪除">🗑️</button>
                 <input type="text" id="newCategoryInput" class="new-cat-input" placeholder="新分類名稱">
-                <button class="unified-btn" onclick="createCategory()">建立</button>
+                <button class="unified-btn" onclick="createCategory()">Build</button>
             </div>
 
             <div class="reminder-row-scroll">
