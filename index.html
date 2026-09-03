@@ -151,23 +151,25 @@
 
         /* 主要通知／提前通知：同一列，手機寬度不夠時可左右滑動 */
         .reminder-row-scroll {
-            overflow-x: auto;
             border: 1px solid var(--border-color);
             border-radius: 8px;
             margin-bottom: 8px;
-            -webkit-overflow-scrolling: touch;
         }
         .reminder-row-inner {
             display: flex;
+            flex-wrap: wrap;
             align-items: center;
-            gap: 5px;
+            gap: 6px;
             padding: 6px;
-            width: max-content;
+            width: 100%;
+            box-sizing: border-box;
         }
+        .reminder-group { display: flex; align-items: center; gap: 5px; flex-wrap: nowrap; min-width: 0; }
         .reminder-label { font-size: 11px; color: var(--text-secondary); white-space: nowrap; flex-shrink: 0; }
         .reminder-datetime {
             height: 26px;
-            width: 150px;
+            min-width: 0;
+            flex: 1 1 130px;
             border: 1px solid var(--border-color);
             border-radius: 5px;
             padding: 0 4px;
@@ -175,7 +177,6 @@
             background: var(--input-bg);
             color: var(--text-color);
             box-sizing: border-box;
-            flex-shrink: 0;
         }
         .reminder-repeat {
             height: 26px;
@@ -187,7 +188,7 @@
             color: var(--text-color);
             flex-shrink: 0;
         }
-        .reminder-divider { width: 1px; height: 20px; background: var(--border-color); margin: 0 4px; flex-shrink: 0; }
+        .reminder-divider { display: none; }
 
         /* 個人秘書區塊 */
         .secretary-section {
@@ -410,23 +411,26 @@
 
             <div class="reminder-row-scroll">
                 <div class="reminder-row-inner">
-                    <span class="reminder-label">⏰主要通知</span>
-                    <input type="datetime-local" id="inputRemindAt" class="reminder-datetime">
-                    <select id="inputRepeat" class="reminder-repeat">
-                        <option value="none">單次</option>
-                        <option value="daily">每天</option>
-                        <option value="weekly">每週</option>
-                        <option value="monthly">每月</option>
-                    </select>
-                    <span class="reminder-divider"></span>
-                    <span class="reminder-label">⏳提前通知</span>
-                    <input type="datetime-local" id="inputExtraRemindAt" class="reminder-datetime">
-                    <select id="inputExtraRepeat" class="reminder-repeat">
-                        <option value="none">單次</option>
-                        <option value="daily">每天</option>
-                        <option value="weekly">每週</option>
-                        <option value="monthly">每月</option>
-                    </select>
+                    <div class="reminder-group">
+                        <span class="reminder-label">⏰主要通知</span>
+                        <input type="datetime-local" id="inputRemindAt" class="reminder-datetime">
+                        <select id="inputRepeat" class="reminder-repeat">
+                            <option value="none">單次</option>
+                            <option value="daily">每天</option>
+                            <option value="weekly">每週</option>
+                            <option value="monthly">每月</option>
+                        </select>
+                    </div>
+                    <div class="reminder-group">
+                        <span class="reminder-label">⏳提前通知</span>
+                        <input type="datetime-local" id="inputExtraRemindAt" class="reminder-datetime">
+                        <select id="inputExtraRepeat" class="reminder-repeat">
+                            <option value="none">單次</option>
+                            <option value="daily">每天</option>
+                            <option value="weekly">每週</option>
+                            <option value="monthly">每月</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
@@ -457,23 +461,26 @@
 
             <div class="reminder-row-scroll">
                 <div class="reminder-row-inner">
-                    <span class="reminder-label">⏰主要通知</span>
-                    <input type="datetime-local" id="editRemindAt" class="reminder-datetime">
-                    <select id="editRepeat" class="reminder-repeat">
-                        <option value="none">單次</option>
-                        <option value="daily">每天</option>
-                        <option value="weekly">每週</option>
-                        <option value="monthly">每月</option>
-                    </select>
-                    <span class="reminder-divider"></span>
-                    <span class="reminder-label">⏳提前通知</span>
-                    <input type="datetime-local" id="editExtraRemindAt" class="reminder-datetime">
-                    <select id="editExtraRepeat" class="reminder-repeat">
-                        <option value="none">單次</option>
-                        <option value="daily">每天</option>
-                        <option value="weekly">每週</option>
-                        <option value="monthly">每月</option>
-                    </select>
+                    <div class="reminder-group">
+                        <span class="reminder-label">⏰主要通知</span>
+                        <input type="datetime-local" id="editRemindAt" class="reminder-datetime">
+                        <select id="editRepeat" class="reminder-repeat">
+                            <option value="none">單次</option>
+                            <option value="daily">每天</option>
+                            <option value="weekly">每週</option>
+                            <option value="monthly">每月</option>
+                        </select>
+                    </div>
+                    <div class="reminder-group">
+                        <span class="reminder-label">⏳提前通知</span>
+                        <input type="datetime-local" id="editExtraRemindAt" class="reminder-datetime">
+                        <select id="editExtraRepeat" class="reminder-repeat">
+                            <option value="none">單次</option>
+                            <option value="daily">每天</option>
+                            <option value="weekly">每週</option>
+                            <option value="monthly">每月</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
