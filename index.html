@@ -70,7 +70,7 @@
 
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; transition: background 0.3s, color 0.3s; }
         
-        .header { position: sticky; top: 0; width: 100%; background: var(--header-bg); box-shadow: 0 2px 10px var(--shadow-color); padding: 12px 0; display: flex; flex-direction: column; align-items: center; z-index: 100; transition: background 0.3s; }
+        .header { position: sticky; top: 0; width: 100%; background: var(--header-bg); box-shadow: 0 2px 10px var(--shadow-color); padding: 12px 0 60px 0; display: flex; flex-direction: column; align-items: center; z-index: 100; transition: background 0.3s; }
         .control-zone { width: 90%; max-width: 500px; display: flex; flex-direction: column; gap: 6px; }
         .input-style { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background-color: var(--input-bg); color: var(--text-color); font-size: 15px; outline: none; box-sizing: border-box; }
         .row-mixed { display: flex; align-items: center; gap: 8px; width: 100%; }
@@ -132,11 +132,12 @@
             width: 30px;
             height: 30px;
             flex-shrink: 0;
-            border: none;
+            border: 1.5px solid var(--text-color);
             border-radius: 50%;
-            background: var(--primary-color);
-            color: #fff;
-            font-size: 14px;
+            background: rgba(255,255,255,0.55);
+            color: var(--text-color);
+            font-size: 16px;
+            font-weight: 600;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -144,7 +145,10 @@
             padding: 0;
             margin-right: 30px;
         }
-        .add-note-fab:active { opacity: 0.7; }
+        .add-note-fab:active { opacity: 0.6; }
+
+        .note-count-corner { position: absolute; bottom: 8px; right: 10px; z-index: 4; }
+        .note-count-corner .info-bar-count { background: rgba(0,0,0,0.4); color: #fff; padding: 3px 9px; border-radius: 10px; font-size: 11px; margin-left: 0; }
 
         /* 圓形雲端上傳按鈕（輸入內容視窗用） */
         .img-url-btn.round { border-radius: 50%; }
@@ -339,7 +343,7 @@
         .load-more-zone { width: 100%; text-align: center; margin-top: 10px; margin-bottom: 30px; }
 
         @media (max-width: 600px) {
-            .header { padding: 8px 0; }
+            .header { padding: 8px 0 60px 0; }
             .category-zone { padding: 4px; gap: 4px; }
             .new-cat-input { margin-left: 8px; } 
             .tool-bar { margin-top: 6px; gap: 4px; }
@@ -351,28 +355,28 @@
 
     <div class="header" id="mainHeader">
         <div class="header-bg-controls">
-            <button id="headerBgMenuBtn" class="header-bg-btn" onclick="toggleHeaderBgMenu()" title="背景圖片設定">⋯</button>
+            <button id="headerBgMenuBtn" class="header-bg-btn" onclick="toggleHeaderBgMenu()" title="更多功能">⋯</button>
             <div id="headerBgMenuPanel" class="header-bg-menu-panel" style="display:none;">
+                <button onclick="exportJSON(); toggleHeaderBgMenu(false);">💾 儲存</button>
+                <button onclick="document.getElementById('importFile').click(); toggleHeaderBgMenu(false);">📂 讀取</button>
+                <button onclick="clearAll(); toggleHeaderBgMenu(false);">🧹 清空</button>
                 <button onclick="triggerHeaderBgUpload(); toggleHeaderBgMenu(false);">🖼️ 上傳背景圖片</button>
                 <button id="headerBgAdjustBtn" style="display:none;" onclick="enterHeaderBgAdjustMode(); toggleHeaderBgMenu(false);">🎯 調整位置</button>
                 <button id="headerBgRemoveBtn" style="display:none;" onclick="removeHeaderBg(); toggleHeaderBgMenu(false);">🗑️ 移除背景圖片</button>
             </div>
+            <input type="file" id="importFile" style="display:none" accept=".json" onchange="importJSON(event)">
         </div>
         <div class="control-zone">
             <div class="row-mixed">
                 <select id="searchCategoryFilter" class="category-select" style="max-width: 130px;" onchange="onSearchInput()">
-                    <option value="">全部分類</option>
+                    <option value="">類別</option>
                 </select>
                 <input type="text" id="searchInput" class="input-style search-bar" style="height: 32px;" placeholder="搜尋..." oninput="onSearchInput()">
-                <button id="addNoteFab" class="add-note-fab" onclick="openInputModal()" title="新增筆記" aria-label="新增筆記">➕</button>
+                <button id="addNoteFab" class="add-note-fab" onclick="openInputModal()" title="新增筆記" aria-label="新增筆記">＋</button>
             </div>
         </div>
-        <div class="tool-bar">
-            <button class="btn-sm" onclick="exportJSON()">Save</button>
-            <button class="btn-sm" onclick="document.getElementById('importFile').click()">Load</button>
-            <button class="btn-sm btn-clear" onclick="clearAll()">Clear</button>
+        <div class="note-count-corner">
             <span id="noteCountDisplay" class="info-bar-count">0 notes</span>
-            <input type="file" id="importFile" style="display:none" accept=".json" onchange="importJSON(event)">
         </div>
     </div>
     <div id="headerBgAdjustBar" class="header-bg-adjust-bar" style="display:none;">
@@ -406,7 +410,7 @@
                 <button class="btn-sm" onclick="editCategoryName()" title="改名">✏️</button>
                 <button class="btn-sm btn-clear" onclick="deleteCategoryName()" title="刪除">🗑️</button>
                 <input type="text" id="newCategoryInput" class="new-cat-input" placeholder="新分類名稱">
-                <button class="unified-btn" onclick="createCategory()">Build</button>
+                <button class="unified-btn" onclick="createCategory()">建立</button>
             </div>
 
             <div class="reminder-row-scroll">
@@ -986,7 +990,7 @@
             });
             
             let optionsHtml = '<option value="">-- 選擇分類 --</option><option value="Secretary">Secretary</option>';
-            let searchOptionsHtml = '<option value="">全部分類</option>';
+            let searchOptionsHtml = '<option value="">類別</option>';
             
             sortedCategories.forEach(cat => {
                 const count = counts[cat.name] || 0;
