@@ -73,6 +73,100 @@
         .header { position: sticky; top: 0; width: 100%; background: var(--header-bg); box-shadow: 0 2px 10px var(--shadow-color); padding: 12px 0 60px 0; display: flex; flex-direction: column; align-items: center; z-index: 100; transition: background 0.3s; }
         .control-zone { width: 90%; max-width: 500px; display: flex; flex-direction: column; gap: 6px; }
         .input-style { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background-color: var(--input-bg); color: var(--text-color); font-size: 15px; outline: none; box-sizing: border-box; }
+
+        /* 富文字內容欄位（contenteditable） */
+        .rich-content { overflow-y: auto; word-wrap: break-word; }
+        .rich-content:empty:before { content: attr(data-placeholder); color: #999; pointer-events: none; }
+        .rich-content b, .rich-content strong { font-weight: 700; }
+        .rich-content a { color: var(--primary-color); text-decoration: underline; }
+
+        .rich-toolbar { display: flex; gap: 4px; margin-bottom: 6px; }
+        .rich-toolbar button {
+            width: 30px;
+            height: 28px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--input-bg);
+            color: var(--text-color);
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .rich-toolbar button:active { background: var(--border-color); }
+        .rich-toolbar .color-swatch-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; padding-top: 2px; line-height: 1; }
+        .rich-toolbar .color-bar { display: block; width: 16px; height: 3px; margin-top: 2px; border-radius: 1px; background: #000; }
+        #inputBgColorBar, #editBgColorBar { background: #FFFF00; }
+
+        /* 色彩選取面板 */
+        .color-panel {
+            position: fixed;
+            width: 220px;
+            max-height: 340px;
+            overflow-y: auto;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+            padding: 10px;
+            z-index: 500;
+        }
+        .color-panel-section-label { font-size: 11px; color: var(--text-secondary); margin: 8px 0 4px 0; }
+        .color-panel-section-label:first-of-type { margin-top: 0; }
+        .color-auto-btn {
+            width: 100%; height: 30px; border: 1px solid var(--border-color); border-radius: 6px;
+            background: var(--input-bg); color: var(--text-color); font-size: 12px; cursor: pointer;
+        }
+        .color-swatch-row { display: flex; flex-wrap: wrap; gap: 4px; }
+        .color-swatch-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; }
+        .color-swatch {
+            width: 18px; height: 18px; border-radius: 3px; border: 1px solid rgba(0,0,0,0.15);
+            cursor: pointer; padding: 0; flex-shrink: 0;
+        }
+        .color-swatch:hover { outline: 2px solid var(--primary-color); }
+        .color-more-btn {
+            width: 100%; height: 30px; margin-top: 8px; border: 1px solid var(--border-color); border-radius: 6px;
+            background: var(--input-bg); color: var(--text-color); font-size: 12px; cursor: pointer;
+        }
+
+        /* 超連結面板 */
+        .link-panel {
+            position: fixed;
+            width: 260px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+            padding: 12px;
+            z-index: 500;
+        }
+
+        /* 編號格式選取面板 */
+        .numbering-panel {
+            position: fixed;
+            width: 170px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+            padding: 10px;
+            z-index: 500;
+        }
+        .numbering-option-btn {
+            width: 100%;
+            height: 34px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--input-bg);
+            color: var(--text-color);
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .numbering-option-btn:active { background: var(--border-color); }
         .row-mixed { display: flex; align-items: center; gap: 8px; width: 100%; }
         .input-sub { flex: 1; min-width: 0; }
         
@@ -453,9 +547,18 @@
                 </div>
             </div>
 
-            <button id="todoToggleBtn" class="unified-btn todo-toggle-btn" style="margin-bottom:8px;" onclick="toggleTodoListMode()">☐</button>
+            <div class="rich-toolbar" id="inputRichToolbar" onmousedown="event.preventDefault()">
+                <button type="button" onclick="applyRichFormat('bold', 'noteContent')"><b>B</b></button>
+                <button type="button" onclick="applyRichFormat('italic', 'noteContent')"><i>I</i></button>
+                <button type="button" onclick="applyRichFormat('underline', 'noteContent')"><u>U</u></button>
+                <button type="button" id="inputTextColorBtn" class="color-swatch-btn" onclick="openColorPanel(this, 'color', 'noteContent')">A<span class="color-bar" id="inputTextColorBar"></span></button>
+                <button type="button" id="inputBgColorBtn" class="color-swatch-btn" onclick="openColorPanel(this, 'backgroundColor', 'noteContent')">A<span class="color-bar" id="inputBgColorBar"></span></button>
+                <button type="button" class="link-trigger-btn" onclick="openLinkPanel(this, 'noteContent')">🔗</button>
+                <button type="button" onclick="insertChecklistMarker('noteContent')">□</button>
+                <button type="button" class="numbering-trigger-btn" onclick="openNumberingPanel(this, 'noteContent')">№</button>
+            </div>
 
-            <textarea id="noteContent" class="input-style" style="height:200px; margin-bottom:10px; resize:vertical;" placeholder="輸入內容" onkeydown="handleContentKeydown(event)" oninput="handleSuggest('content')"></textarea>
+            <div id="noteContent" class="input-style rich-content" contenteditable="true" style="height:200px; margin-bottom:10px; overflow-y:auto;" data-placeholder="輸入內容" onfocus="document.execCommand('defaultParagraphSeparator', false, 'br')" onpaste="handleRichPaste(event)" oninput="handleSuggest('content')" onkeydown="handleListEnterKey(event, 'noteContent')"></div>
 
             <div id="inputExtraFieldsWrapper">
                 <input type="text" id="noteKeywords" class="input-style" style="height: 32px; margin-bottom:8px;" placeholder="關鍵字" onkeydown="handleKeywordsKeydown(event)" oninput="handleSuggest('keywords')">
@@ -503,7 +606,18 @@
                 </div>
             </div>
 
-            <textarea id="editContent" class="input-style" style="height:200px; margin-bottom:15px; resize:vertical;" onkeydown="handleEditContentKeydown(event)"></textarea>
+            <div class="rich-toolbar" id="editRichToolbar" onmousedown="event.preventDefault()">
+                <button type="button" onclick="applyRichFormat('bold', 'editContent')"><b>B</b></button>
+                <button type="button" onclick="applyRichFormat('italic', 'editContent')"><i>I</i></button>
+                <button type="button" onclick="applyRichFormat('underline', 'editContent')"><u>U</u></button>
+                <button type="button" id="editTextColorBtn" class="color-swatch-btn" onclick="openColorPanel(this, 'color', 'editContent')">A<span class="color-bar" id="editTextColorBar"></span></button>
+                <button type="button" id="editBgColorBtn" class="color-swatch-btn" onclick="openColorPanel(this, 'backgroundColor', 'editContent')">A<span class="color-bar" id="editBgColorBar"></span></button>
+                <button type="button" class="link-trigger-btn" onclick="openLinkPanel(this, 'editContent')">🔗</button>
+                <button type="button" onclick="insertChecklistMarker('editContent')">□</button>
+                <button type="button" class="numbering-trigger-btn" onclick="openNumberingPanel(this, 'editContent')">№</button>
+            </div>
+
+            <div id="editContent" class="input-style rich-content" contenteditable="true" style="height:200px; margin-bottom:15px; overflow-y:auto;" onfocus="document.execCommand('defaultParagraphSeparator', false, 'br')" onpaste="handleRichPaste(event)" onkeydown="handleListEnterKey(event, 'editContent')"></div>
             <div class="row-mixed" id="editExtraFieldsWrapper" style="margin-bottom:10px">
                 <input type="text" id="editKeywords" class="input-style input-sub" style="height: 32px;" placeholder="關鍵字">
                 <button type="button" class="img-url-btn" onclick="triggerCloudinaryUploadEdit(this)" title="上傳圖片至 Cloudinary">☁️</button>
@@ -519,6 +633,39 @@
         <img id="viewer-img" src="" alt="放大圖片">
         <button id="viewer-next" class="viewer-btn" onclick="switchViewerImg(1, event)">›</button>
         <div id="viewer-index"></div>
+    </div>
+
+    <!-- 共用色彩選取面板（文字顏色／背景色共用） -->
+    <div id="colorPanel" class="color-panel" onmousedown="event.preventDefault()" style="display:none;">
+        <div class="color-panel-section-label">自動</div>
+        <button class="color-auto-btn" onclick="applyColorChoice('auto')">🚫 自動</button>
+        <div id="colorPanelRecentSection" style="display:none;">
+            <div class="color-panel-section-label">最近使用的色彩</div>
+            <div id="colorPanelRecent" class="color-swatch-row"></div>
+        </div>
+        <div class="color-panel-section-label">佈景主題色彩</div>
+        <div id="colorPanelTheme" class="color-swatch-grid"></div>
+        <div class="color-panel-section-label">標準色彩</div>
+        <div id="colorPanelStandard" class="color-swatch-row"></div>
+        <button class="color-more-btn" onclick="document.getElementById('nativeColorInput').click()">🎨 其他色彩…</button>
+        <input type="color" id="nativeColorInput" style="display:none;" onchange="handleNativeColorPick(event)">
+    </div>
+
+    <!-- 共用超連結面板 -->
+    <div id="linkPanel" class="link-panel" style="display:none;">
+        <input type="text" id="linkUrlInput" class="input-style" style="height:34px; margin-bottom:8px;" placeholder="貼上網址，例如 https://example.com">
+        <div style="display:flex; gap:6px;" onmousedown="event.preventDefault()">
+            <button class="unified-btn" style="flex:1; height:34px;" onclick="confirmLinkInsert()">套用</button>
+            <button id="linkRemoveBtn" class="btn-sm btn-clear" style="display:none; height:34px;" onclick="confirmLinkRemove()">移除連結</button>
+            <button class="btn-sm" style="height:34px;" onclick="closeLinkPanel()">取消</button>
+        </div>
+    </div>
+
+    <!-- 共用編號格式選取面板 -->
+    <div id="numberingPanel" class="numbering-panel" onmousedown="event.preventDefault()" style="display:none;">
+        <button type="button" class="numbering-option-btn" onclick="applyNumberingFormat('abc')">a.　b.　c.</button>
+        <button type="button" class="numbering-option-btn" onclick="applyNumberingFormat('paren')">(1)　(2)　(3)</button>
+        <button type="button" class="numbering-option-btn" onclick="applyNumberingFormat('arabic')">1.　2.　3.</button>
     </div>
 
     <script>
@@ -762,45 +909,14 @@
         initHeaderBgDrag();
         loadHeaderBgFromSettings();
 
-        function toggleTodoListMode() {
-            const btn = document.getElementById('todoToggleBtn');
-            const txtArea = document.getElementById('noteContent');
-
-            if (btn.innerText === '☐') {
-                btn.innerText = '☑';
-                txtArea.value = "【】";
-                txtArea.focus();
-                txtArea.setSelectionRange(1, 1);
-            } else {
-                btn.innerText = '☐';
-                txtArea.value = "";
-            }
-        }
-
-        function updateInputCategoryMode() {
-            const isSecretary = document.getElementById('noteCategory').value === 'Secretary';
-            const wrapper = document.getElementById('inputExtraFieldsWrapper');
-            wrapper.style.display = isSecretary ? 'none' : 'block';
-            if (isSecretary) {
-                document.getElementById('noteKeywords').value = '';
-                document.getElementById('suggestionBox').innerHTML = '';
-            }
-        }
-
-        function updateEditCategoryMode() {
-            const isSecretary = document.getElementById('editCategory').value === 'Secretary';
-            document.getElementById('editExtraFieldsWrapper').style.display = isSecretary ? 'none' : 'flex';
-        }
-
         function openInputModal() {
-            document.getElementById('noteContent').value = '';
+            document.getElementById('noteContent').innerHTML = '';
             document.getElementById('noteKeywords').value = '';
             document.getElementById('noteCategory').value = '';
             document.getElementById('inputRemindAt').value = '';
             document.getElementById('inputRepeat').value = 'none';
             document.getElementById('inputExtraRemindAt').value = '';
             document.getElementById('inputExtraRepeat').value = 'none';
-            document.getElementById('todoToggleBtn').innerText = '☐';
             tempImages = [];
             document.getElementById('preview-area').innerHTML = '';
             document.getElementById('suggestionBox').innerHTML = '';
@@ -813,32 +929,510 @@
             document.getElementById('inputModal').style.display = 'none';
         }
 
-        function handleContentKeydown(e) {
-            const txtArea = document.getElementById('noteContent');
-            if (e.key === 'Enter') {
-                if (txtArea.value.includes('【') && txtArea.value.includes('】')) {
-                    e.preventDefault();
-                    const start = txtArea.selectionStart;
-                    const end = txtArea.selectionEnd;
-                    const text = txtArea.value;
-                    txtArea.value = text.substring(0, start) + "\n□ " + text.substring(end);
-                    txtArea.selectionStart = txtArea.selectionEnd = start + 3;
+        function updateInputCategoryMode() {
+            const isSecretary = document.getElementById('noteCategory').value === 'Secretary';
+            const wrapper = document.getElementById('inputExtraFieldsWrapper');
+            wrapper.style.display = isSecretary ? 'none' : 'block';
+            document.getElementById('inputRichToolbar').style.display = isSecretary ? 'none' : 'flex';
+            if (isSecretary) {
+                document.getElementById('noteKeywords').value = '';
+                document.getElementById('suggestionBox').innerHTML = '';
+            }
+        }
+
+        function updateEditCategoryMode() {
+            const isSecretary = document.getElementById('editCategory').value === 'Secretary';
+            document.getElementById('editExtraFieldsWrapper').style.display = isSecretary ? 'none' : 'flex';
+            document.getElementById('editRichToolbar').style.display = isSecretary ? 'none' : 'flex';
+        }
+
+        function applyRichFormat(command, targetId) {
+            document.getElementById(targetId).focus();
+            document.execCommand(command, false, null);
+        }
+
+        function handleRichPaste(e) {
+            e.preventDefault();
+            const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+            document.execCommand('insertText', false, text);
+        }
+
+        // ===== Phase 2：文字顏色／背景色／超連結／清除格式 =====
+        let savedRange = null;
+        let colorPanelMode = null;      // 'color' 或 'backgroundColor'
+        let colorPanelTargetId = null;
+        let linkPanelTargetId = null;
+        let savedExistingLink = null;
+
+        function hexToHsl(hex) {
+            const r = parseInt(hex.substr(1, 2), 16) / 255, g = parseInt(hex.substr(3, 2), 16) / 255, b = parseInt(hex.substr(5, 2), 16) / 255;
+            const max = Math.max(r, g, b), min = Math.min(r, g, b);
+            let h, s, l = (max + min) / 2;
+            if (max === min) { h = s = 0; }
+            else {
+                const d = max - min;
+                s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+                switch (max) {
+                    case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                    case g: h = (b - r) / d + 2; break;
+                    default: h = (r - g) / d + 4;
+                }
+                h /= 6;
+            }
+            return [h * 360, s * 100, l * 100];
+        }
+        function hslToHex(h, s, l) {
+            s /= 100; l /= 100;
+            const k = n => (n + h / 30) % 12;
+            const a = s * Math.min(l, 1 - l);
+            const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+            const toHex = x => Math.round(255 * x).toString(16).padStart(2, '0');
+            return `#${toHex(f(0))}${toHex(f(8))}${toHex(f(4))}`;
+        }
+        const THEME_BASE_COLORS = ['#44546A', '#5B9BD5', '#ED7D31', '#A5A5A5', '#FFC000', '#4472C4', '#70AD47', '#264478', '#9E480E', '#636363'];
+        const STANDARD_COLORS = ['#C00000', '#FF0000', '#FFC000', '#FFFF00', '#92D050', '#00B050', '#00B0F0', '#0070C0', '#002060', '#7030A0'];
+        function generateThemeColumn(hex) {
+            const [h, s] = hexToHsl(hex);
+            return [85, 65, 50, 35, 20].map(l => hslToHex(h, s, l));
+        }
+        function makeSwatchBtn(color) {
+            const btn = document.createElement('button');
+            btn.className = 'color-swatch';
+            btn.style.background = color;
+            btn.title = color;
+            btn.onclick = () => applyColorChoice(color);
+            return btn;
+        }
+        function buildColorPanelContent() {
+            const themeGrid = document.getElementById('colorPanelTheme');
+            themeGrid.innerHTML = '';
+            const columns = THEME_BASE_COLORS.map(generateThemeColumn);
+            for (let row = 0; row < 5; row++) {
+                for (let col = 0; col < 10; col++) {
+                    themeGrid.appendChild(makeSwatchBtn(columns[col][row]));
+                }
+            }
+            const standardRow = document.getElementById('colorPanelStandard');
+            standardRow.innerHTML = '';
+            STANDARD_COLORS.forEach(c => standardRow.appendChild(makeSwatchBtn(c)));
+        }
+        function getRecentColors() {
+            try { return JSON.parse(localStorage.getItem('richTextRecentColors') || '[]'); } catch (e) { return []; }
+        }
+        function addRecentColor(hex) {
+            let recent = getRecentColors().filter(c => c.toLowerCase() !== hex.toLowerCase());
+            recent.unshift(hex);
+            localStorage.setItem('richTextRecentColors', JSON.stringify(recent.slice(0, 8)));
+        }
+        function renderRecentColors() {
+            const recent = getRecentColors();
+            const section = document.getElementById('colorPanelRecentSection');
+            const row = document.getElementById('colorPanelRecent');
+            row.innerHTML = '';
+            if (recent.length === 0) { section.style.display = 'none'; return; }
+            section.style.display = 'block';
+            recent.forEach(c => row.appendChild(makeSwatchBtn(c)));
+        }
+
+        function positionFloatingPanel(panel, anchorBtn) {
+            panel.style.maxHeight = '';
+            panel.style.visibility = 'hidden';
+            panel.style.display = 'block';
+            const rect = anchorBtn.getBoundingClientRect();
+            const panelRect = panel.getBoundingClientRect();
+            const vw = window.innerWidth, vh = window.innerHeight;
+            let top = rect.bottom + 4;
+            if (top + panelRect.height > vh - 8) {
+                top = rect.top - panelRect.height - 4;
+                if (top < 8) {
+                    top = 8;
+                    panel.style.maxHeight = (vh - 16) + 'px';
+                }
+            }
+            let left = rect.left;
+            if (left + panelRect.width > vw - 8) left = vw - panelRect.width - 8;
+            if (left < 8) left = 8;
+            panel.style.top = top + 'px';
+            panel.style.left = left + 'px';
+            panel.style.visibility = 'visible';
+        }
+
+        function openColorPanel(btn, mode, targetId) {
+            const el = document.getElementById(targetId);
+            el.focus();
+            const sel = window.getSelection();
+            if (sel.rangeCount === 0 || sel.isCollapsed) {
+                alert('請先選取要套用顏色的文字');
+                return;
+            }
+            savedRange = sel.getRangeAt(0).cloneRange();
+            colorPanelMode = mode;
+            colorPanelTargetId = targetId;
+            buildColorPanelContent();
+            renderRecentColors();
+            document.getElementById('linkPanel').style.display = 'none'; // 只隱藏連結面板，不可呼叫 closeLinkPanel()，否則會清掉剛存好的 savedRange
+            positionFloatingPanel(document.getElementById('colorPanel'), btn);
+        }
+
+        function closeColorPanel() {
+            document.getElementById('colorPanel').style.display = 'none';
+            savedRange = null;
+        }
+
+        function wrapSelectionWithStyle(cssProp, value) {
+            const sel = window.getSelection();
+            if (sel.rangeCount === 0) return;
+            const range = sel.getRangeAt(0);
+            const frag = range.extractContents();
+            const span = document.createElement('span');
+            span.style[cssProp] = value;
+            span.appendChild(frag);
+            range.insertNode(span);
+            sel.removeAllRanges();
+        }
+
+        function removeStyleFromSelection(cssProp) {
+            const sel = window.getSelection();
+            if (sel.rangeCount === 0) return;
+            const range = sel.getRangeAt(0);
+            const frag = range.extractContents();
+            const walker = document.createTreeWalker(frag, NodeFilter.SHOW_ELEMENT, null);
+            const spansToUnwrap = [];
+            let node;
+            while (node = walker.nextNode()) {
+                if (node.tagName === 'SPAN') {
+                    node.style[cssProp] = '';
+                    if (!node.getAttribute('style')) spansToUnwrap.push(node);
+                }
+            }
+            spansToUnwrap.forEach(span => {
+                const parent = span.parentNode;
+                while (span.firstChild) parent.insertBefore(span.firstChild, span);
+                parent.removeChild(span);
+            });
+            range.insertNode(frag);
+            sel.removeAllRanges();
+        }
+
+        function updateColorBar(targetId, mode, color) {
+            const prefix = targetId === 'noteContent' ? 'input' : 'edit';
+            const barId = mode === 'color' ? `${prefix}TextColorBar` : `${prefix}BgColorBar`;
+            const bar = document.getElementById(barId);
+            if (bar) bar.style.background = color;
+        }
+
+        function restoreSavedSelection(targetId) {
+            const el = document.getElementById(targetId);
+            el.focus();
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            if (savedRange) sel.addRange(savedRange);
+            return sel;
+        }
+
+        function applyColorChoice(value) {
+            if (!savedRange || !colorPanelTargetId) return;
+            const sel = restoreSavedSelection(colorPanelTargetId);
+            if (sel.rangeCount === 0) return;
+
+            if (value === 'auto') {
+                removeStyleFromSelection(colorPanelMode);
+            } else {
+                wrapSelectionWithStyle(colorPanelMode, value);
+                updateColorBar(colorPanelTargetId, colorPanelMode, value);
+            }
+            closeColorPanel();
+        }
+
+        function handleNativeColorPick(e) {
+            const color = e.target.value;
+            addRecentColor(color);
+            applyColorChoice(color);
+        }
+
+        function openLinkPanel(btn, targetId) {
+            const el = document.getElementById(targetId);
+            el.focus();
+            const sel = window.getSelection();
+            if (sel.rangeCount === 0 || sel.isCollapsed) {
+                alert('請先選取要加上連結的文字');
+                return;
+            }
+            savedRange = sel.getRangeAt(0).cloneRange();
+            linkPanelTargetId = targetId;
+
+            let node = sel.anchorNode;
+            let existingLink = null;
+            while (node && node !== el) {
+                if (node.nodeType === 1 && node.tagName === 'A') { existingLink = node; break; }
+                node = node.parentNode;
+            }
+            savedExistingLink = existingLink;
+
+            const urlInput = document.getElementById('linkUrlInput');
+            const removeBtn = document.getElementById('linkRemoveBtn');
+            if (existingLink) {
+                urlInput.value = existingLink.getAttribute('href') || '';
+                removeBtn.style.display = 'inline-block';
+            } else {
+                urlInput.value = '';
+                removeBtn.style.display = 'none';
+            }
+            document.getElementById('colorPanel').style.display = 'none'; // 只隱藏顏色面板，不可呼叫 closeColorPanel()，否則會清掉剛存好的 savedRange
+            positionFloatingPanel(document.getElementById('linkPanel'), btn);
+            urlInput.focus();
+        }
+
+        function confirmLinkInsert() {
+            let url = document.getElementById('linkUrlInput').value.trim();
+            if (!url) { closeLinkPanel(); return; }
+            if (!/^https?:\/\//i.test(url) && !/^mailto:/i.test(url)) url = 'https://' + url;
+
+            if (!linkPanelTargetId) { closeLinkPanel(); return; }
+            const sel = restoreSavedSelection(linkPanelTargetId);
+            if (sel.rangeCount === 0) { closeLinkPanel(); return; }
+
+            if (savedExistingLink) {
+                savedExistingLink.setAttribute('href', url);
+            } else {
+                const range = sel.getRangeAt(0);
+                const frag = range.extractContents();
+                const a = document.createElement('a');
+                a.setAttribute('href', url);
+                a.appendChild(frag);
+                range.insertNode(a);
+                sel.removeAllRanges();
+            }
+            closeLinkPanel();
+        }
+
+        function confirmLinkRemove() {
+            if (linkPanelTargetId) document.getElementById(linkPanelTargetId).focus();
+            if (savedExistingLink) {
+                const parent = savedExistingLink.parentNode;
+                while (savedExistingLink.firstChild) parent.insertBefore(savedExistingLink.firstChild, savedExistingLink);
+                parent.removeChild(savedExistingLink);
+            }
+            closeLinkPanel();
+        }
+
+        function closeLinkPanel() {
+            document.getElementById('linkPanel').style.display = 'none';
+            savedRange = null;
+            savedExistingLink = null;
+        }
+
+        // ===== Phase 3：核取方塊（□）與自動編號清單 =====
+        let numberingPanelTargetId = null;
+
+        // 在游標（或選取範圍）處插入核取方塊符號
+        function insertChecklistMarker(targetId) {
+            const el = document.getElementById(targetId);
+            el.focus();
+            document.execCommand('insertText', false, '□ ');
+        }
+
+        function openNumberingPanel(btn, targetId) {
+            const el = document.getElementById(targetId);
+            el.focus();
+            numberingPanelTargetId = targetId;
+            document.getElementById('colorPanel').style.display = 'none';
+            document.getElementById('linkPanel').style.display = 'none';
+            positionFloatingPanel(document.getElementById('numberingPanel'), btn);
+        }
+
+        function closeNumberingPanel() {
+            document.getElementById('numberingPanel').style.display = 'none';
+            numberingPanelTargetId = null;
+        }
+
+        // 套用選擇的編號格式，於游標處插入第一個編號
+        function applyNumberingFormat(type) {
+            if (!numberingPanelTargetId) { closeNumberingPanel(); return; }
+            const el = document.getElementById(numberingPanelTargetId);
+            el.focus();
+            const marker = type === 'abc' ? 'a. ' : (type === 'paren' ? '(1) ' : '1. ');
+            document.execCommand('insertText', false, marker);
+            closeNumberingPanel();
+        }
+
+        // 走訪 contenteditable 內容，將 <br> 視為換行符 '\n'，回傳從頭到指定節點/位置為止的文字
+        function getTextWithBreaks(container, stopNode, stopOffset) {
+            let result = '';
+            let done = false;
+            function walk(node) {
+                if (done) return;
+                if (node.nodeType === 3) {
+                    if (node === stopNode) {
+                        result += node.textContent.slice(0, stopOffset);
+                        done = true;
+                    } else {
+                        result += node.textContent;
+                    }
+                    return;
+                }
+                if (node.nodeName === 'BR') {
+                    result += '\n';
+                    if (node === stopNode) done = true;
+                    return;
+                }
+                const children = node.childNodes;
+                for (let i = 0; i < children.length; i++) {
+                    if (node === stopNode && i === stopOffset) { done = true; return; }
+                    walk(children[i]);
+                    if (done) return;
+                }
+                if (node === stopNode && stopOffset >= children.length) done = true;
+            }
+            walk(container);
+            return result;
+        }
+
+        // 取得游標所在那一行的文字（游標前段、游標後段、整行）
+        function getCurrentLineText(el, caretNode, caretOffset) {
+            const beforeCaret = getTextWithBreaks(el, caretNode, caretOffset);
+            const fullText = getTextWithBreaks(el, el, el.childNodes.length);
+            const afterCaret = fullText.slice(beforeCaret.length);
+            const linePrefix = beforeCaret.split('\n').pop();
+            const lineSuffix = afterCaret.split('\n')[0];
+            return { linePrefix, lineSuffix, fullLine: linePrefix + lineSuffix };
+        }
+
+        // 偵測一行開頭是否為核取方塊或編號清單標記
+        function matchListMarker(text) {
+            const patterns = [
+                { type: 'checkbox', regex: /^□ / },
+                { type: 'abc', regex: /^([a-zA-Z])\. / },
+                { type: 'paren', regex: /^\((\d+)\) / },
+                { type: 'arabic', regex: /^(\d+)\. / }
+            ];
+            for (const p of patterns) {
+                const m = text.match(p.regex);
+                if (m) return { type: p.type, text: m[0], match: m };
+            }
+            return null;
+        }
+
+        // 根據目前的清單標記，算出下一行該接續的標記
+        function getNextMarker(marker) {
+            switch (marker.type) {
+                case 'checkbox':
+                    return '□ ';
+                case 'abc': {
+                    const letter = marker.match[1];
+                    const isUpper = letter === letter.toUpperCase();
+                    let code = letter.toLowerCase().charCodeAt(0) + 1;
+                    if (code > 122) code = 97; // 超過 z 就回到 a
+                    let next = String.fromCharCode(code);
+                    if (isUpper) next = next.toUpperCase();
+                    return next + '. ';
+                }
+                case 'paren': {
+                    const num = parseInt(marker.match[1], 10) + 1;
+                    return '(' + num + ') ';
+                }
+                case 'arabic': {
+                    const num = parseInt(marker.match[1], 10) + 1;
+                    return num + '. ';
                 }
             }
         }
 
-        function handleEditContentKeydown(e) {
-            const txtArea = document.getElementById('editContent');
-            if (e.key === 'Enter') {
-                if (txtArea.value.includes('【') && txtArea.value.includes('】')) {
-                    e.preventDefault();
-                    const start = txtArea.selectionStart;
-                    const end = txtArea.selectionEnd;
-                    const text = txtArea.value;
-                    txtArea.value = text.substring(0, start) + "\n□ " + text.substring(end);
-                    txtArea.selectionStart = txtArea.selectionEnd = start + 3;
-                }
+        // 刪除目前這一行、從行首到游標為止的內容（用來移除清單標記）
+        function removeLinePrefixAtCaret(charCount) {
+            const sel = window.getSelection();
+            for (let i = 0; i < charCount; i++) {
+                sel.modify('extend', 'backward', 'character');
             }
+            document.execCommand('delete', false, null);
+        }
+
+        // 在核取方塊 / 編號清單中按下 Enter 時的接續或結束行為
+        function handleListEnterKey(e, targetId) {
+            if (e.key !== 'Enter' || e.shiftKey) return;
+            const el = document.getElementById(targetId);
+            const sel = window.getSelection();
+            if (sel.rangeCount === 0 || !sel.isCollapsed) return;
+            const range = sel.getRangeAt(0);
+            if (!el.contains(range.startContainer)) return;
+
+            const lineInfo = getCurrentLineText(el, range.startContainer, range.startOffset);
+            const marker = matchListMarker(lineInfo.fullLine);
+            if (!marker) return; // 非清單行，交給預設 Enter 行為
+
+            e.preventDefault();
+
+            const contentAfterMarker = lineInfo.fullLine.slice(marker.text.length).trim();
+            if (contentAfterMarker === '') {
+                // 該行只有標記、沒有其他內容：按 Enter 直接刪除標記，退出清單
+                removeLinePrefixAtCaret(lineInfo.linePrefix.length);
+            } else {
+                // 該行已輸入內容：換行並接續下一個標記
+                const nextMarker = getNextMarker(marker);
+                document.execCommand('insertHTML', false, '<br>' + nextMarker);
+            }
+        }
+
+        document.addEventListener('click', function(e) {
+            const colorPanel = document.getElementById('colorPanel');
+            if (colorPanel && colorPanel.style.display === 'block' && !colorPanel.contains(e.target) && !e.target.closest('.color-swatch-btn')) {
+                closeColorPanel();
+            }
+            const linkPanelEl = document.getElementById('linkPanel');
+            if (linkPanelEl && linkPanelEl.style.display === 'block' && !linkPanelEl.contains(e.target) && !e.target.closest('.link-trigger-btn')) {
+                closeLinkPanel();
+            }
+            const numberingPanelEl = document.getElementById('numberingPanel');
+            if (numberingPanelEl && numberingPanelEl.style.display === 'block' && !numberingPanelEl.contains(e.target) && !e.target.closest('.numbering-trigger-btn')) {
+                closeNumberingPanel();
+            }
+        });
+
+        function sanitizeRichHtml(html) {
+            const allowedTags = new Set(['B', 'STRONG', 'I', 'EM', 'U', 'BR', 'SPAN', 'A', 'DIV']);
+            const container = document.createElement('div');
+            container.innerHTML = html;
+
+            function clean(node) {
+                [...node.childNodes].forEach(child => {
+                    if (child.nodeType === 3) return; // 文字節點，保留
+                    if (child.nodeType !== 1 || !allowedTags.has(child.tagName)) {
+                        // 不是允許的標籤：保留裡面的文字/子節點，拿掉標籤本身
+                        while (child.firstChild) node.insertBefore(child.firstChild, child);
+                        node.removeChild(child);
+                        return;
+                    }
+                    // 允許的標籤：清掉不需要的屬性
+                    [...child.attributes].forEach(attr => {
+                        if (child.tagName === 'SPAN' && attr.name === 'style') {
+                            const allowedStyle = [];
+                            const colorMatch = attr.value.match(/(?:^|;)\s*color\s*:\s*([^;]+)/i);
+                            const bgMatch = attr.value.match(/background-color\s*:\s*([^;]+)/i);
+                            if (colorMatch) allowedStyle.push(`color:${colorMatch[1].trim()}`);
+                            if (bgMatch) allowedStyle.push(`background-color:${bgMatch[1].trim()}`);
+                            if (allowedStyle.length) child.setAttribute('style', allowedStyle.join(';'));
+                            else child.removeAttribute('style');
+                        } else if (child.tagName === 'A' && attr.name === 'href') {
+                            // 保留
+                        } else {
+                            child.removeAttribute(attr.name);
+                        }
+                    });
+                    if (child.tagName === 'A') {
+                        child.setAttribute('target', '_blank');
+                        child.setAttribute('rel', 'noopener noreferrer');
+                    }
+                    clean(child);
+                });
+            }
+            clean(container);
+            return container.innerHTML;
+        }
+
+        function stripTags(html) {
+            const div = document.createElement('div');
+            div.innerHTML = html;
+            return div.textContent || '';
         }
 
         function handleKeywordsKeydown(e) {
@@ -1107,7 +1701,8 @@
                 if (isReminderNote(n)) return false;
                 if (searchSelectVal && n.category !== searchSelectVal) return false;
                 if (searchTerms.length === 0) return true;
-                const fullText = (n.content + ' ' + (n.keywords || '') + ' ' + (n.category || '')).toLowerCase();
+                const searchableContent = n.richText ? stripTags(n.content) : n.content;
+                const fullText = (searchableContent + ' ' + (n.keywords || '') + ' ' + (n.category || '')).toLowerCase();
                 return searchTerms.every(term => fullText.includes(term));
             });
 
@@ -1274,13 +1869,22 @@
                     }).slice(0, 3);
                     if (related.length > 0) {
                         relatedHtml = `<div class="related-section"><div class="related-label">🔗 相關筆記：</div>` + 
-                            related.map(r => `<div class="related-link" onclick="event.stopPropagation(); scrollToNote('${r.id}')">${highlightText(r.content.substring(0, 20), searchFilterText)}...</div>`).join('') + `</div>`;
+                            related.map(r => {
+                                const plainSnippet = r.richText ? stripTags(r.content) : r.content;
+                                return `<div class="related-link" onclick="event.stopPropagation(); scrollToNote('${r.id}')">${highlightText(plainSnippet.substring(0, 20), searchFilterText)}...</div>`;
+                            }).join('') + `</div>`;
                     }
                 }
 
-                const highlightedContent = highlightText(note.content, searchFilterText);
-                const linkResult = processContentLinks(highlightedContent);
-                const finalBodyHtml = parseTodoListHtml(linkResult.html, note.id);
+                let finalBodyHtml, ytHtml = '';
+                if (note.richText) {
+                    finalBodyHtml = sanitizeRichHtml(note.content);
+                } else {
+                    const highlightedContent = highlightText(note.content, searchFilterText);
+                    const linkResult = processContentLinks(highlightedContent);
+                    finalBodyHtml = parseTodoListHtml(linkResult.html, note.id);
+                    ytHtml = linkResult.ytHtml;
+                }
 
                 const pinClass = note.isPinned ? 'pin-item pinned' : 'pin-item';
                 
@@ -1297,7 +1901,7 @@
                     ${pinButtonHtml}
                     ${catHtml}
                     <div class="note-text collapsed" id="text-${note.id}">${finalBodyHtml}</div>
-                    ${linkResult.ytHtml}
+                    ${ytHtml}
                     <div class="toggle-text-btn" id="toggle-btn-${note.id}" onclick="event.stopPropagation(); toggleText('${note.id}')">🔽</div>
                     <div class="tag-list">${tagsHtml}</div>
                     <div class="image-gallery">${imgsHtml}</div>
@@ -1389,7 +1993,7 @@
 
         function handleSuggest(type) {
             if (document.getElementById('noteCategory').value === 'Secretary') return;
-            const content = document.getElementById('noteContent').value;
+            const content = document.getElementById('noteContent').innerText;
             const kwInput = document.getElementById('noteKeywords');
             const box = document.getElementById('suggestionBox');
             box.innerHTML = '';
@@ -1403,9 +2007,11 @@
         }
 
         function saveNote() {
-            const content = document.getElementById('noteContent').value;
-            const keywords = document.getElementById('noteKeywords').value;
             const category = document.getElementById('noteCategory').value;
+            const isSecretary = category === 'Secretary';
+            const contentEl = document.getElementById('noteContent');
+            const content = isSecretary ? contentEl.innerText.trim() : sanitizeRichHtml(contentEl.innerHTML);
+            const keywords = document.getElementById('noteKeywords').value;
             const remindAt = document.getElementById('inputRemindAt').value;
             const repeat = document.getElementById('inputRepeat').value;
             const extraRemindAt = document.getElementById('inputExtraRemindAt').value;
@@ -1416,11 +2022,12 @@
             if (!content && allImages.length === 0) return;
             const id = Date.now().toString();
             const noteData = { id, content, keywords, category, images: allImages, time: new Date().toLocaleString(), isPinned: false, completed: false };
+            if (!isSecretary) noteData.richText = true;
             if (remindAt) { noteData.remindAt = remindAt; noteData.repeat = repeat; }
             if (extraRemindAt) { noteData.extraRemindAt = extraRemindAt; noteData.extraRepeat = extraRepeat; }
             db.child(id).set(noteData);
 
-            document.getElementById('noteContent').value = '';
+            document.getElementById('noteContent').innerHTML = '';
             document.getElementById('noteKeywords').value = '';
             document.getElementById('noteCategory').value = '';
             document.getElementById('inputRemindAt').value = '';
@@ -1429,7 +2036,6 @@
             document.getElementById('inputExtraRepeat').value = 'none';
             tempImages = [];
             document.getElementById('preview-area').innerHTML = '';
-            document.getElementById('todoToggleBtn').innerText = '☐';
             document.getElementById('inputModal').style.display = 'none';
         }
 
@@ -1573,7 +2179,14 @@
             const note = notes.find(n => n.id === id);
             if(!note) return; editingId = id;
             editImages = note.images ? [...note.images] : [];
-            document.getElementById('editContent').value = note.content;
+            const editContentEl = document.getElementById('editContent');
+            if (note.richText) {
+                editContentEl.innerHTML = note.content;
+            } else {
+                const escapeDiv = document.createElement('div');
+                escapeDiv.textContent = note.content || '';
+                editContentEl.innerHTML = escapeDiv.innerHTML.replace(/\n/g, '<br>');
+            }
             document.getElementById('editKeywords').value = note.keywords || '';
             document.getElementById('editCategory').value = note.category || '';
             document.getElementById('editRemindAt').value = note.remindAt || '';
@@ -1585,17 +2198,22 @@
             document.getElementById('editModal').style.display = 'flex';
         }
         function updateNote() {
+            const category = document.getElementById('editCategory').value;
+            const isSecretary = category === 'Secretary';
+            const editContentEl = document.getElementById('editContent');
+            const content = isSecretary ? editContentEl.innerText.trim() : sanitizeRichHtml(editContentEl.innerHTML);
             const remindAt = document.getElementById('editRemindAt').value;
             const repeat = document.getElementById('editRepeat').value;
             const extraRemindAt = document.getElementById('editExtraRemindAt').value;
             const extraRepeat = document.getElementById('editExtraRepeat').value;
 
             db.child(editingId).update({
-                content: document.getElementById('editContent').value, 
+                content: content, 
                 keywords: document.getElementById('editKeywords').value,
-                category: document.getElementById('editCategory').value,
+                category: category,
                 images: editImages,
                 time: new Date().toLocaleString() + ' (已修改)',
+                richText: isSecretary ? null : true,
                 remindAt: remindAt || null,
                 repeat: remindAt ? repeat : null,
                 extraRemindAt: extraRemindAt || null,
