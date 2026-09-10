@@ -947,8 +947,11 @@
         }
 
         function applyRichFormat(command, targetId) {
-            document.getElementById(targetId).focus();
+            const el = document.getElementById(targetId);
+            el.focus();
+            ensureFormatSelection(targetId);
             document.execCommand(command, false, null);
+            captureFormatSelection(targetId);
         }
 
         function handleRichPaste(e) {
@@ -963,6 +966,85 @@
         let colorPanelTargetId = null;
         let linkPanelTargetId = null;
         let savedExistingLink = null;
+
+        // ===== 連續套用格式（反選文字後可連續點選工具列而不失效）=====
+        let formatSelectionOffsets = {}; // { targetId: {start, end} }，記錄「最後一次有效的反選範圍」
+
+        // 走訪 contenteditable 內容，將 <br> 視為換行符 '\n'，回傳從頭到指定節點/位置為止的文字
+        // （與 Phase 3 的 getTextWithBreaks 共用同一份定義，見下方）
+
+        // 取得目前選取範圍相對於容器的字元位移（起、迄）
+        function getSelectionOffsets(el) {
+            const sel = window.getSelection();
+            if (sel.rangeCount === 0) return null;
+            const range = sel.getRangeAt(0);
+            if (!el.contains(range.startContainer) || !el.contains(range.endContainer)) return null;
+            const start = getTextWithBreaks(el, range.startContainer, range.startOffset).length;
+            const end = getTextWithBreaks(el, range.endContainer, range.endOffset).length;
+            return { start: Math.min(start, end), end: Math.max(start, end) };
+        }
+
+        // 將字元位移換算回 DOM 中對應的節點與位置（getSelectionOffsets 的反向操作）
+        function findPositionAtOffset(container, targetOffset) {
+            let remaining = targetOffset;
+            let found = null;
+            function walk(node) {
+                const children = node.childNodes;
+                for (let i = 0; i < children.length; i++) {
+                    if (found) return;
+                    const child = children[i];
+                    if (child.nodeType === 3) {
+                        const len = child.textContent.length;
+                        if (remaining <= len) { found = { node: child, offset: remaining }; return; }
+                        remaining -= len;
+                    } else if (child.nodeName === 'BR') {
+                        if (remaining <= 0) { found = { node: node, offset: i }; return; }
+                        remaining -= 1;
+                    } else {
+                        walk(child);
+                    }
+                }
+            }
+            walk(container);
+            return found || { node: container, offset: container.childNodes.length };
+        }
+
+        // 依先前記錄的字元位移，重建出對應的選取範圍
+        function setSelectionFromOffsets(el, offsets) {
+            if (!offsets || offsets.start === offsets.end) return false;
+            const startPos = findPositionAtOffset(el, offsets.start);
+            const endPos = findPositionAtOffset(el, offsets.end);
+            const range = document.createRange();
+            try {
+                range.setStart(startPos.node, startPos.offset);
+                range.setEnd(endPos.node, endPos.offset);
+            } catch (e) {
+                return false;
+            }
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+            return true;
+        }
+
+        // 若目前選取範圍已失效（被上一次格式指令收合），改用記錄下來的範圍還原反選狀態
+        function ensureFormatSelection(targetId) {
+            const el = document.getElementById(targetId);
+            const sel = window.getSelection();
+            const liveOk = sel.rangeCount > 0 && !sel.isCollapsed &&
+                el.contains(sel.getRangeAt(0).startContainer) && el.contains(sel.getRangeAt(0).endContainer);
+            if (liveOk) return true;
+            return setSelectionFromOffsets(el, formatSelectionOffsets[targetId]);
+        }
+
+        // 記錄目前這一次「有效的反選範圍」，供下一次連續點選工具列時使用
+        function captureFormatSelection(targetId) {
+            const el = document.getElementById(targetId);
+            const offsets = getSelectionOffsets(el);
+            if (offsets && offsets.start !== offsets.end) {
+                formatSelectionOffsets[targetId] = offsets;
+            }
+        }
 
         function hexToHsl(hex) {
             const r = parseInt(hex.substr(1, 2), 16) / 255, g = parseInt(hex.substr(3, 2), 16) / 255, b = parseInt(hex.substr(5, 2), 16) / 255;
@@ -1060,11 +1142,11 @@
         function openColorPanel(btn, mode, targetId) {
             const el = document.getElementById(targetId);
             el.focus();
-            const sel = window.getSelection();
-            if (sel.rangeCount === 0 || sel.isCollapsed) {
+            if (!ensureFormatSelection(targetId)) {
                 alert('請先選取要套用顏色的文字');
                 return;
             }
+            const sel = window.getSelection();
             savedRange = sel.getRangeAt(0).cloneRange();
             colorPanelMode = mode;
             colorPanelTargetId = targetId;
@@ -1141,6 +1223,7 @@
                 wrapSelectionWithStyle(colorPanelMode, value);
                 updateColorBar(colorPanelTargetId, colorPanelMode, value);
             }
+            captureFormatSelection(colorPanelTargetId);
             closeColorPanel();
         }
 
@@ -1153,11 +1236,11 @@
         function openLinkPanel(btn, targetId) {
             const el = document.getElementById(targetId);
             el.focus();
-            const sel = window.getSelection();
-            if (sel.rangeCount === 0 || sel.isCollapsed) {
+            if (!ensureFormatSelection(targetId)) {
                 alert('請先選取要加上連結的文字');
                 return;
             }
+            const sel = window.getSelection();
             savedRange = sel.getRangeAt(0).cloneRange();
             linkPanelTargetId = targetId;
 
@@ -1203,6 +1286,7 @@
                 range.insertNode(a);
                 sel.removeAllRanges();
             }
+            captureFormatSelection(linkPanelTargetId);
             closeLinkPanel();
         }
 
@@ -1225,11 +1309,28 @@
         // ===== Phase 3：核取方塊（□）與自動編號清單 =====
         let numberingPanelTargetId = null;
 
-        // 在游標（或選取範圍）處插入核取方塊符號
-        function insertChecklistMarker(targetId) {
+        // 在「該行最前面」插入清單標記文字（核取方塊或編號），若游標當時不在行首、
+        // 該行已有內容，仍會把標記插到行首，並讓游標回到原本相對於文字的位置
+        function insertLineMarkerAtFront(targetId, markerText) {
             const el = document.getElementById(targetId);
             el.focus();
-            document.execCommand('insertText', false, '□ ');
+            const sel = window.getSelection();
+            if (sel.rangeCount === 0) { document.execCommand('insertText', false, markerText); return; }
+            if (!sel.isCollapsed) sel.collapseToStart();
+            const range = sel.getRangeAt(0);
+            if (!el.contains(range.startContainer)) { document.execCommand('insertText', false, markerText); return; }
+
+            const lineInfo = getCurrentLineText(el, range.startContainer, range.startOffset);
+            const prefixLen = lineInfo.linePrefix.length;
+
+            for (let i = 0; i < prefixLen; i++) sel.modify('move', 'backward', 'character');
+            document.execCommand('insertText', false, markerText);
+            for (let i = 0; i < prefixLen; i++) sel.modify('move', 'forward', 'character');
+        }
+
+        // 在游標（或選取範圍）處插入核取方塊符號
+        function insertChecklistMarker(targetId) {
+            insertLineMarkerAtFront(targetId, '□ ');
         }
 
         function openNumberingPanel(btn, targetId) {
@@ -1246,13 +1347,11 @@
             numberingPanelTargetId = null;
         }
 
-        // 套用選擇的編號格式，於游標處插入第一個編號
+        // 套用選擇的編號格式，於該行行首插入第一個編號
         function applyNumberingFormat(type) {
             if (!numberingPanelTargetId) { closeNumberingPanel(); return; }
-            const el = document.getElementById(numberingPanelTargetId);
-            el.focus();
             const marker = type === 'abc' ? 'a. ' : (type === 'paren' ? '(1) ' : '1. ');
-            document.execCommand('insertText', false, marker);
+            insertLineMarkerAtFront(numberingPanelTargetId, marker);
             closeNumberingPanel();
         }
 
@@ -1300,11 +1399,12 @@
 
         // 偵測一行開頭是否為核取方塊或編號清單標記
         function matchListMarker(text) {
+            // 空白字元可能是一般空格，也可能被瀏覽器轉成不斷行空格（&nbsp;），兩種都要接受
             const patterns = [
-                { type: 'checkbox', regex: /^□ / },
-                { type: 'abc', regex: /^([a-zA-Z])\. / },
-                { type: 'paren', regex: /^\((\d+)\) / },
-                { type: 'arabic', regex: /^(\d+)\. / }
+                { type: 'checkbox', regex: /^□[ \u00A0]/ },
+                { type: 'abc', regex: /^([a-zA-Z])\.[ \u00A0]/ },
+                { type: 'paren', regex: /^\((\d+)\)[ \u00A0]/ },
+                { type: 'arabic', regex: /^(\d+)\.[ \u00A0]/ }
             ];
             for (const p of patterns) {
                 const m = text.match(p.regex);
@@ -1386,6 +1486,29 @@
             if (numberingPanelEl && numberingPanelEl.style.display === 'block' && !numberingPanelEl.contains(e.target) && !e.target.closest('.numbering-trigger-btn')) {
                 closeNumberingPanel();
             }
+        });
+
+        // 即時追蹤兩個內容欄位（新增／修改）目前反選的文字範圍，
+        // 讓格式指令（B/I/U/顏色/連結）即使被瀏覽器收合選取範圍，也能接續套用在同一段反選文字上
+        ['noteContent', 'editContent'].forEach(function(id) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            // 使用者直接點進文字內容（而非透過工具列按鈕）時，視為新的操作意圖，清除舊的反選紀錄
+            el.addEventListener('mousedown', function() { delete formatSelectionOffsets[id]; });
+            el.addEventListener('touchstart', function() { delete formatSelectionOffsets[id]; });
+        });
+        document.addEventListener('selectionchange', function() {
+            ['noteContent', 'editContent'].forEach(function(id) {
+                const el = document.getElementById(id);
+                if (!el) return;
+                const sel = window.getSelection();
+                if (sel.rangeCount === 0 || sel.isCollapsed) return;
+                const range = sel.getRangeAt(0);
+                if (el.contains(range.startContainer) && el.contains(range.endContainer)) {
+                    const offsets = getSelectionOffsets(el);
+                    if (offsets && offsets.start !== offsets.end) formatSelectionOffsets[id] = offsets;
+                }
+            });
         });
 
         function sanitizeRichHtml(html) {
