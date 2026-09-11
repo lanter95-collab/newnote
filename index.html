@@ -553,7 +553,7 @@
                 <button type="button" onclick="applyRichFormat('underline', 'noteContent')"><u>U</u></button>
                 <button type="button" id="inputTextColorBtn" class="color-swatch-btn" onclick="openColorPanel(this, 'color', 'noteContent')">A<span class="color-bar" id="inputTextColorBar"></span></button>
                 <button type="button" id="inputBgColorBtn" class="color-swatch-btn" onclick="openColorPanel(this, 'backgroundColor', 'noteContent')">A<span class="color-bar" id="inputBgColorBar"></span></button>
-                <button type="button" class="link-trigger-btn" onclick="openLinkPanel(this, 'noteContent')">🔗</button>
+                <button type="button" class="img-url-btn" onclick="triggerInlineImageUpload(this, 'noteContent')" title="在游標位置插入圖片">☁️</button>
                 <button type="button" onclick="insertChecklistMarker('noteContent')">□</button>
                 <button type="button" class="numbering-trigger-btn" onclick="openNumberingPanel(this, 'noteContent')">№</button>
             </div>
@@ -613,6 +613,7 @@
                 <button type="button" id="editTextColorBtn" class="color-swatch-btn" onclick="openColorPanel(this, 'color', 'editContent')">A<span class="color-bar" id="editTextColorBar"></span></button>
                 <button type="button" id="editBgColorBtn" class="color-swatch-btn" onclick="openColorPanel(this, 'backgroundColor', 'editContent')">A<span class="color-bar" id="editBgColorBar"></span></button>
                 <button type="button" class="link-trigger-btn" onclick="openLinkPanel(this, 'editContent')">🔗</button>
+                <button type="button" class="img-url-btn" onclick="triggerInlineImageUpload(this, 'editContent')" title="在游標位置插入圖片">☁️</button>
                 <button type="button" onclick="insertChecklistMarker('editContent')">□</button>
                 <button type="button" class="numbering-trigger-btn" onclick="openNumberingPanel(this, 'editContent')">№</button>
             </div>
@@ -727,6 +728,43 @@
             document.getElementById('cloudinaryFileInput').click();
         }
 
+        // 觸發 Cloudinary 檔案選擇器（工具列，上傳後插入在目前游標位置）
+        function triggerInlineImageUpload(btn, targetId) {
+            const el = document.getElementById(targetId);
+            el.focus();
+            const sel = window.getSelection();
+            savedRange = (sel.rangeCount > 0) ? sel.getRangeAt(0).cloneRange() : null;
+            currentUploadBtn = btn;
+            currentUploadMode = (targetId === 'noteContent') ? 'inline-add' : 'inline-edit';
+            document.getElementById('cloudinaryFileInput').click();
+        }
+
+        function insertImageAtSavedRange(targetId, url) {
+            const el = document.getElementById(targetId);
+            el.focus();
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            if (savedRange) {
+                sel.addRange(savedRange);
+            } else {
+                const range = document.createRange();
+                range.selectNodeContents(el);
+                range.collapse(false);
+                sel.addRange(range);
+            }
+            const range = sel.getRangeAt(0);
+            range.deleteContents();
+            const img = document.createElement('img');
+            img.src = url;
+            img.className = 'note-img inline-note-img';
+            range.insertNode(img);
+            range.setStartAfter(img);
+            range.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(range);
+            savedRange = null;
+        }
+
         // Cloudinary 上傳邏輯（已修正字串處理與連線例外處理）
         async function uploadToCloudinary(e) {
             const file = e.target.files[0];
@@ -754,6 +792,10 @@
                     if (currentUploadMode === 'edit') {
                         editImages.push(imageUrl);
                         updateEditPreview();
+                    } else if (currentUploadMode === 'inline-add') {
+                        insertImageAtSavedRange('noteContent', imageUrl);
+                    } else if (currentUploadMode === 'inline-edit') {
+                        insertImageAtSavedRange('editContent', imageUrl);
                     } else {
                         tempImages.push(imageUrl);
                         updatePreview();
@@ -1330,7 +1372,7 @@
 
         // 在游標（或選取範圍）處插入核取方塊符號
         function insertChecklistMarker(targetId) {
-            insertLineMarkerAtFront(targetId, '□ ');
+            insertLineMarkerAtFront(targetId, '□\u00A0');
         }
 
         function openNumberingPanel(btn, targetId) {
@@ -1350,7 +1392,7 @@
         // 套用選擇的編號格式，於該行行首插入第一個編號
         function applyNumberingFormat(type) {
             if (!numberingPanelTargetId) { closeNumberingPanel(); return; }
-            const marker = type === 'abc' ? 'a. ' : (type === 'paren' ? '(1) ' : '1. ');
+            const marker = type === 'abc' ? 'a.\u00A0' : (type === 'paren' ? '(1)\u00A0' : '1.\u00A0');
             insertLineMarkerAtFront(numberingPanelTargetId, marker);
             closeNumberingPanel();
         }
@@ -1417,7 +1459,7 @@
         function getNextMarker(marker) {
             switch (marker.type) {
                 case 'checkbox':
-                    return '□ ';
+                    return '□\u00A0';
                 case 'abc': {
                     const letter = marker.match[1];
                     const isUpper = letter === letter.toUpperCase();
@@ -1425,15 +1467,15 @@
                     if (code > 122) code = 97; // 超過 z 就回到 a
                     let next = String.fromCharCode(code);
                     if (isUpper) next = next.toUpperCase();
-                    return next + '. ';
+                    return next + '.\u00A0';
                 }
                 case 'paren': {
                     const num = parseInt(marker.match[1], 10) + 1;
-                    return '(' + num + ') ';
+                    return '(' + num + ')\u00A0';
                 }
                 case 'arabic': {
                     const num = parseInt(marker.match[1], 10) + 1;
-                    return num + '. ';
+                    return num + '.\u00A0';
                 }
             }
         }
@@ -1512,7 +1554,7 @@
         });
 
         function sanitizeRichHtml(html) {
-            const allowedTags = new Set(['B', 'STRONG', 'I', 'EM', 'U', 'BR', 'SPAN', 'A', 'DIV']);
+            const allowedTags = new Set(['B', 'STRONG', 'I', 'EM', 'U', 'BR', 'SPAN', 'A', 'DIV', 'IMG']);
             const container = document.createElement('div');
             container.innerHTML = html;
 
@@ -1537,6 +1579,8 @@
                             else child.removeAttribute('style');
                         } else if (child.tagName === 'A' && attr.name === 'href') {
                             // 保留
+                        } else if (child.tagName === 'IMG' && attr.name === 'src') {
+                            // 保留
                         } else {
                             child.removeAttribute(attr.name);
                         }
@@ -1545,10 +1589,60 @@
                         child.setAttribute('target', '_blank');
                         child.setAttribute('rel', 'noopener noreferrer');
                     }
+                    if (child.tagName === 'IMG') {
+                        const src = child.getAttribute('src') || '';
+                        if (!/^https?:\/\//i.test(src)) { node.removeChild(child); return; }
+                        child.setAttribute('class', 'note-img inline-note-img');
+                    }
                     clean(child);
                 });
             }
             clean(container);
+            return container.innerHTML;
+        }
+
+        function autoLinkPlainUrls(html) {
+            const container = document.createElement('div');
+            container.innerHTML = html;
+            const urlRegex = /((https?:\/\/|www\.)[^\s<]+)/gi;
+
+            function isInsideLink(node) {
+                let p = node.parentNode;
+                while (p) {
+                    if (p.nodeType === 1 && p.tagName === 'A') return true;
+                    p = p.parentNode;
+                }
+                return false;
+            }
+
+            function walk(node) {
+                [...node.childNodes].forEach(child => {
+                    if (child.nodeType === 3) {
+                        if (isInsideLink(child)) return;
+                        const text = child.textContent;
+                        urlRegex.lastIndex = 0;
+                        if (!urlRegex.test(text)) return;
+                        urlRegex.lastIndex = 0;
+                        const frag = document.createDocumentFragment();
+                        let lastIndex = 0, match;
+                        while ((match = urlRegex.exec(text)) !== null) {
+                            if (match.index > lastIndex) frag.appendChild(document.createTextNode(text.substring(lastIndex, match.index)));
+                            let href = match[0];
+                            if (!/^https?:\/\//i.test(href)) href = 'https://' + href;
+                            const a = document.createElement('a');
+                            a.setAttribute('href', href);
+                            a.textContent = match[0];
+                            frag.appendChild(a);
+                            lastIndex = match.index + match[0].length;
+                        }
+                        if (lastIndex < text.length) frag.appendChild(document.createTextNode(text.substring(lastIndex)));
+                        child.parentNode.replaceChild(frag, child);
+                    } else if (child.nodeType === 1) {
+                        walk(child);
+                    }
+                });
+            }
+            walk(container);
             return container.innerHTML;
         }
 
@@ -2133,7 +2227,7 @@
             const category = document.getElementById('noteCategory').value;
             const isSecretary = category === 'Secretary';
             const contentEl = document.getElementById('noteContent');
-            const content = isSecretary ? contentEl.innerText.trim() : sanitizeRichHtml(contentEl.innerHTML);
+            const content = isSecretary ? contentEl.innerText.trim().replace(/\u00A0/g, ' ') : autoLinkPlainUrls(sanitizeRichHtml(contentEl.innerHTML));
             const keywords = document.getElementById('noteKeywords').value;
             const remindAt = document.getElementById('inputRemindAt').value;
             const repeat = document.getElementById('inputRepeat').value;
@@ -2196,6 +2290,14 @@
         
         function deleteNote(id) { if(confirm('確定刪除？')) db.child(id).remove(); }
         
+        // 內文中間插入圖片（inline-note-img）點擊放大
+        document.getElementById('note-container').addEventListener('click', function(e) {
+            if (e.target.classList && e.target.classList.contains('inline-note-img')) {
+                e.stopPropagation();
+                openViewer(0, [e.target.src]);
+            }
+        });
+
         function openViewer(index, imagesList) {
             viewerImages = imagesList;
             viewerIndex = index;
@@ -2324,7 +2426,7 @@
             const category = document.getElementById('editCategory').value;
             const isSecretary = category === 'Secretary';
             const editContentEl = document.getElementById('editContent');
-            const content = isSecretary ? editContentEl.innerText.trim() : sanitizeRichHtml(editContentEl.innerHTML);
+            const content = isSecretary ? editContentEl.innerText.trim().replace(/\u00A0/g, ' ') : autoLinkPlainUrls(sanitizeRichHtml(editContentEl.innerHTML));
             const remindAt = document.getElementById('editRemindAt').value;
             const repeat = document.getElementById('editRepeat').value;
             const extraRemindAt = document.getElementById('editExtraRemindAt').value;
