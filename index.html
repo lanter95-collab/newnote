@@ -466,6 +466,9 @@
         .secretary-item { -webkit-touch-callout: none; }
         .secretary-item.sec-dragging { background: var(--card-bg); box-shadow: 0 4px 14px var(--shadow-color); outline: 1px solid var(--primary-color); border-radius: 8px; transform: scale(1.02); z-index: 5; }
         body.sec-no-select, body.sec-no-select * { -webkit-user-select: none; user-select: none; }
+        /* 個人秘書收合時：每筆只顯示第一行，其餘隱藏（點 🔽 展開看全部） */
+        #secretaryList.secretary-collapsed .secretary-content,
+        #secretaryList.secretary-collapsed .secretary-content.rich { white-space: pre; max-height: 1.5em; overflow: hidden; text-overflow: ellipsis; }
     </style>
 </head>
 <body>
@@ -1690,6 +1693,16 @@
             return `${mm}/${dd}(${wd}) ${hh}:${mi}${repeatLabel ? `<span class="reminder-badge-tag">${repeatLabel}</span>` : ''}`;
         }
 
+        function secretaryNoteIsMultiline(note) {
+            if (!note) return false;
+            let c = (note.content || '').trim();
+            if (note.richText) {
+                c = c.replace(/(<br\s*\/?>|\s)+$/i, '');
+                return /<br|<div/i.test(c);
+            }
+            return c.indexOf('\n') !== -1;
+        }
+
         function buildSecretaryItemHtml(note) {
             let finalBodyHtml;
             if (note.richText) {
@@ -1740,11 +1753,14 @@
 
             const displayItems = secretaryExpanded ? items : items.slice(0, 1);
             let html = displayItems.map(buildSecretaryItemHtml).join('');
-            if (items.length > 1) {
+            // 多筆，或只有一筆但內容有多行時，都要有展開/收合鈕
+            const needToggle = items.length > 1 || secretaryNoteIsMultiline(items[0]);
+            if (needToggle) {
                 html += secretaryExpanded
                     ? `<button class="secretary-collapse-btn" onclick="toggleSecretaryExpand()">🔼</button>`
                     : `<button class="secretary-collapse-btn" onclick="toggleSecretaryExpand()">🔽</button>`;
             }
+            listEl.className = secretaryExpanded ? '' : 'secretary-collapsed';
             listEl.innerHTML = html;
         }
 
