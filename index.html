@@ -1920,7 +1920,7 @@
             const lines = note.content.split('\n');
             if (lines[lineIndex]) {
                 if (isChecked) {
-                    lines[lineIndex] = lines[lineIndex].replace('add', '■ ').replace('□ ', '■ ');
+                    lines[lineIndex] = lines[lineIndex].replace('□ ', '■ ');
                 } else {
                     lines[lineIndex] = lines[lineIndex].replace('■ ', '□ ');
                 }
@@ -2084,19 +2084,39 @@
         }
 
         function scrollToNote(id) {
-            activeCategoryFilter = ''; 
+            // 清除篩選，確保目標筆記一定在列表中
+            activeCategoryFilter = '';
             document.getElementById('searchCategoryFilter').value = '';
-            
-            const targetIndex = notes.findIndex(n => n.id === id);
-            if (targetIndex !== -1) {
-                const requiredPage = Math.ceil((targetIndex + 1) / PAGE_SIZE);
-                if (requiredPage > currentPage) {
-                    currentPage = requiredPage;
+            document.getElementById('searchInput').value = '';
+
+            // 從第 1 頁重新渲染
+            currentPage = 1;
+            executeFilter();
+
+            // 用「實際顯示的清單」(filteredNotes) 來找位置
+            const targetIndex = filteredNotes.findIndex(n => n.id === id);
+
+            if (targetIndex === -1) {
+                // 目標是秘書提醒類筆記：展開秘書區並捲動過去
+                const target = notes.find(n => n.id === id);
+                if (target && isReminderNote(target)) {
+                    secretaryHidden = false;
+                    localStorage.setItem('secretaryHidden', 'false');
+                    secretaryExpanded = true;
+                    renderSecretaryList();
+                    const sec = document.getElementById('secretarySection');
+                    if (sec) sec.scrollIntoView({ behavior: 'auto', block: 'start' });
                 }
+                return;
             }
-            
-            executeFilter(); 
-            
+
+            // 逐頁補渲染，直到目標所在的那一頁
+            const requiredPage = Math.ceil((targetIndex + 1) / PAGE_SIZE);
+            while (currentPage < requiredPage) {
+                currentPage++;
+                renderNotesList();
+            }
+
             const el = document.getElementById(`note-${id}`);
             if (el) {
                 el.scrollIntoView({ behavior: 'auto' });
