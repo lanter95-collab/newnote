@@ -447,6 +447,25 @@
             .tool-bar { margin-top: 6px; gap: 4px; }
             .btn-sm { padding: 4px 6px; font-size: 11px; }
         }
+
+        /* ===== 新增筆記視窗：格式工具列併入通知區（左：工具列，右：主要／提前通知） ===== */
+        .reminder-row-inner.with-toolbar { flex-wrap: nowrap; align-items: center; }
+        .reminder-row-inner.with-toolbar .rich-toolbar { flex-wrap: wrap; width: 98px; flex-shrink: 0; margin-bottom: 0; align-content: center; }
+        .reminder-col { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
+        #noteContent { height: 236px; }
+        @media (max-width: 480px) {
+            .reminder-row-inner.with-toolbar { flex-wrap: wrap; }
+            .reminder-row-inner.with-toolbar .rich-toolbar { width: 100%; flex-wrap: nowrap; }
+            .reminder-col { flex: 1 1 100%; }
+            #noteContent { height: 200px; }
+        }
+
+        /* ===== 個人秘書：保留換行、長按拖曳排序 ===== */
+        .secretary-content { white-space: pre-wrap; word-break: break-word; }
+        .secretary-content.rich { white-space: normal; }
+        .secretary-item { -webkit-touch-callout: none; }
+        .secretary-item.sec-dragging { background: var(--card-bg); box-shadow: 0 4px 14px var(--shadow-color); outline: 1px solid var(--primary-color); border-radius: 8px; transform: scale(1.02); z-index: 5; }
+        body.sec-no-select, body.sec-no-select * { -webkit-user-select: none; user-select: none; }
     </style>
 </head>
 <body>
@@ -512,42 +531,41 @@
             </div>
 
             <div class="reminder-row-scroll">
-                <div class="reminder-row-inner">
-                    <div class="reminder-group">
-                        <span class="reminder-label">⏰主要通知</span>
-                        <input type="datetime-local" id="inputRemindAt" class="reminder-datetime">
-                        <select id="inputRepeat" class="reminder-repeat">
-                            <option value="none">單次</option>
-                            <option value="daily">每天</option>
-                            <option value="weekly">每週</option>
-                            <option value="monthly">每月</option>
-                        </select>
+                <div class="reminder-row-inner with-toolbar">
+                    <div class="rich-toolbar" id="inputRichToolbar" onmousedown="event.preventDefault()">
+                        <button type="button" onclick="applyRichFormat('bold', 'noteContent')"><b>B</b></button>
+                        <button type="button" onclick="applyRichFormat('italic', 'noteContent')"><i>I</i></button>
+                        <button type="button" onclick="applyRichFormat('underline', 'noteContent')"><u>U</u></button>
+                        <button type="button" id="inputTextColorBtn" class="color-swatch-btn" onclick="openColorPanel(this, 'color', 'noteContent')">A<span class="color-bar" id="inputTextColorBar"></span></button>
+                        <button type="button" id="inputBgColorBtn" class="color-swatch-btn" onclick="openColorPanel(this, 'backgroundColor', 'noteContent')">A<span class="color-bar" id="inputBgColorBar"></span></button>
+                        <button type="button" class="numbering-trigger-btn" onclick="openNumberingPanel(this, 'noteContent')">№</button>
                     </div>
-                    <div class="reminder-group">
-                        <span class="reminder-label">⏳提前通知</span>
-                        <input type="datetime-local" id="inputExtraRemindAt" class="reminder-datetime">
-                        <select id="inputExtraRepeat" class="reminder-repeat">
-                            <option value="none">單次</option>
-                            <option value="daily">每天</option>
-                            <option value="weekly">每週</option>
-                            <option value="monthly">每月</option>
-                        </select>
+                    <div class="reminder-col">
+                        <div class="reminder-group">
+                            <span class="reminder-label">⏰主要通知</span>
+                            <input type="datetime-local" id="inputRemindAt" class="reminder-datetime">
+                            <select id="inputRepeat" class="reminder-repeat">
+                                <option value="none">單次</option>
+                                <option value="daily">每天</option>
+                                <option value="weekly">每週</option>
+                                <option value="monthly">每月</option>
+                            </select>
+                        </div>
+                        <div class="reminder-group">
+                            <span class="reminder-label">⏳提前通知</span>
+                            <input type="datetime-local" id="inputExtraRemindAt" class="reminder-datetime">
+                            <select id="inputExtraRepeat" class="reminder-repeat">
+                                <option value="none">單次</option>
+                                <option value="daily">每天</option>
+                                <option value="weekly">每週</option>
+                                <option value="monthly">每月</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="rich-toolbar" id="inputRichToolbar" onmousedown="event.preventDefault()">
-                <button type="button" onclick="applyRichFormat('bold', 'noteContent')"><b>B</b></button>
-                <button type="button" onclick="applyRichFormat('italic', 'noteContent')"><i>I</i></button>
-                <button type="button" onclick="applyRichFormat('underline', 'noteContent')"><u>U</u></button>
-                <button type="button" id="inputTextColorBtn" class="color-swatch-btn" onclick="openColorPanel(this, 'color', 'noteContent')">A<span class="color-bar" id="inputTextColorBar"></span></button>
-                <button type="button" id="inputBgColorBtn" class="color-swatch-btn" onclick="openColorPanel(this, 'backgroundColor', 'noteContent')">A<span class="color-bar" id="inputBgColorBar"></span></button>
-                <button type="button" class="img-url-btn" onclick="triggerInlineImageUpload(this, 'noteContent')" title="在游標位置插入圖片">☁️</button>
-                <button type="button" onclick="insertChecklistMarker('noteContent')">□</button>
-                <button type="button" class="numbering-trigger-btn" onclick="openNumberingPanel(this, 'noteContent')">№</button>
-            </div>
-
-            <div id="noteContent" class="input-style rich-content" contenteditable="true" style="height:200px; margin-bottom:10px; overflow-y:auto;" data-placeholder="輸入內容" onfocus="document.execCommand('defaultParagraphSeparator', false, 'br')" onpaste="handleRichPaste(event)" oninput="handleSuggest('content')" onkeydown="handleListEnterKey(event, 'noteContent')"></div>
+            <div id="noteContent" class="input-style rich-content" contenteditable="true" style="margin-bottom:10px; overflow-y:auto;" data-placeholder="輸入內容" onfocus="document.execCommand('defaultParagraphSeparator', false, 'br')" onpaste="handleRichPaste(event)" oninput="handleSuggest('content')" onkeydown="handleListEnterKey(event, 'noteContent')"></div>
 
             <div id="inputExtraFieldsWrapper">
                 <input type="text" id="noteKeywords" class="input-style" style="height: 32px; margin-bottom:8px;" placeholder="關鍵字" onkeydown="handleKeywordsKeydown(event)" oninput="handleSuggest('keywords')">
@@ -601,8 +619,6 @@
                 <button type="button" onclick="applyRichFormat('underline', 'editContent')"><u>U</u></button>
                 <button type="button" id="editTextColorBtn" class="color-swatch-btn" onclick="openColorPanel(this, 'color', 'editContent')">A<span class="color-bar" id="editTextColorBar"></span></button>
                 <button type="button" id="editBgColorBtn" class="color-swatch-btn" onclick="openColorPanel(this, 'backgroundColor', 'editContent')">A<span class="color-bar" id="editBgColorBar"></span></button>
-                <button type="button" class="img-url-btn" onclick="triggerInlineImageUpload(this, 'editContent')" title="在游標位置插入圖片">☁️</button>
-                <button type="button" onclick="insertChecklistMarker('editContent')">□</button>
                 <button type="button" class="numbering-trigger-btn" onclick="openNumberingPanel(this, 'editContent')">№</button>
             </div>
 
@@ -1498,6 +1514,40 @@
             return container.innerHTML;
         }
 
+        // 讓富文字筆記的「第一行」維持加粗（第一個換行 <br> 或區塊 <div> 之前的內容）
+        function boldFirstLineRich(html) {
+            const container = document.createElement('div');
+            container.innerHTML = html;
+
+            function isBlankText(node) {
+                return node.nodeType === 3 && node.textContent.replace(/[\s\u00A0]/g, '') === '';
+            }
+            function wrapFirstLine(parent) {
+                let node = parent.firstChild;
+                while (node) {
+                    if (node.nodeName === 'BR' || isBlankText(node)) { node = node.nextSibling; continue; }
+                    if (node.nodeName === 'DIV') {
+                        if (wrapFirstLine(node)) return true;
+                        node = node.nextSibling;
+                        continue;
+                    }
+                    const span = document.createElement('span');
+                    span.className = 'first-line-bold';
+                    parent.insertBefore(span, node);
+                    let cur = node;
+                    while (cur && cur.nodeName !== 'BR' && cur.nodeName !== 'DIV') {
+                        const next = cur.nextSibling;
+                        span.appendChild(cur);
+                        cur = next;
+                    }
+                    return true;
+                }
+                return false;
+            }
+            wrapFirstLine(container);
+            return container.innerHTML;
+        }
+
         function autoLinkPlainUrls(html) {
             const container = document.createElement('div');
             container.innerHTML = html;
@@ -1605,6 +1655,7 @@
         // ===== 個人秘書（提醒清單）相關 =====
         let secretaryExpanded = false;
         let secretaryHidden = localStorage.getItem('secretaryHidden') === 'true';
+        let secretaryOrder = [];   // 使用者自訂的排序（存放筆記 id，同步在 Firebase）
 
         function isReminderNote(n) {
             return !!(n.remindAt || n.extraRemindAt);
@@ -1612,6 +1663,12 @@
 
         function getSecretaryNotes() {
             return notes.filter(isReminderNote).sort((a, b) => {
+                // 已手動排序過的，依自訂順序；尚未排序的（例如新建立的）排在後面，並依通知時間排列
+                const aPos = secretaryOrder.indexOf(a.id);
+                const bPos = secretaryOrder.indexOf(b.id);
+                if (aPos !== -1 && bPos !== -1) return aPos - bPos;
+                if (aPos !== -1) return -1;
+                if (bPos !== -1) return 1;
                 const aTime = new Date(a.remindAt || a.extraRemindAt).getTime();
                 const bTime = new Date(b.remindAt || b.extraRemindAt).getTime();
                 return aTime - bTime;
@@ -1634,20 +1691,26 @@
         }
 
         function buildSecretaryItemHtml(note) {
-            const highlightedContent = highlightText(note.content, '');
-            const linkResult = processContentLinks(highlightedContent);
-            const finalBodyHtml = parseTodoListHtml(linkResult.html, note.id);
+            let finalBodyHtml;
+            if (note.richText) {
+                finalBodyHtml = boldFirstLineRich(sanitizeRichHtml(note.content));
+            } else {
+                const highlightedContent = highlightText(note.content, '');
+                const linkResult = processContentLinks(highlightedContent);
+                finalBodyHtml = parseTodoListHtml(linkResult.html, note.id);
+            }
             const mainBadge = note.remindAt ? `<span class="reminder-badge main">⏰ ${formatReminderBadge(note.remindAt, note.repeat)}</span>` : '';
             const extraBadge = note.extraRemindAt ? `<span class="reminder-badge extra">⏳ ${formatReminderBadge(note.extraRemindAt, note.extraRepeat)}</span>` : '';
             return `
-                <div class="secretary-item" ondblclick="openEditModal('${note.id}')">
+                <div class="secretary-item" data-id="${note.id}" ondblclick="openEditModal('${note.id}')">
                     <button class="secretary-delete" onclick="event.stopPropagation(); deleteNote('${note.id}')" title="刪除">×</button>
                     <div class="secretary-badges">${mainBadge}${extraBadge}</div>
-                    <div class="secretary-content">${finalBodyHtml}</div>
+                    <div class="secretary-content${note.richText ? ' rich' : ''}">${finalBodyHtml}</div>
                 </div>`;
         }
 
         function renderSecretaryList() {
+            if (secDrag && secDrag.active) return; // 拖曳中先不重繪，放開後再更新
             const section = document.getElementById('secretarySection');
             const showBtn = document.getElementById('showSecretaryBtn');
             const listEl = document.getElementById('secretaryList');
@@ -1695,6 +1758,141 @@
             localStorage.setItem('secretaryHidden', secretaryHidden ? 'true' : 'false');
             renderSecretaryList();
         }
+
+
+        // 同步自訂排序（跨裝置）
+        dbSettings.child('secretaryOrder').on('value', (snap) => {
+            const v = snap.val();
+            secretaryOrder = Array.isArray(v) ? v : (v ? Object.values(v) : []);
+            renderSecretaryList();
+        });
+
+        // ===== 個人秘書：長按拖曳排序（手機長按、電腦滑鼠按住皆可）=====
+        const SEC_LONG_PRESS_MS = 400;
+        const SEC_MOVE_TOLERANCE = 8;
+        let secDrag = null;            // { item, startX, startY, lastY, active, timer }
+        let secAutoScrollTimer = null;
+        let secLastTouchTime = 0;
+
+        function secOnPress(e, x, y) {
+            const target = e.target;
+            if (!target || !target.closest) return;
+            if (target.closest('button, a, input, textarea, select, .yt-preview-container')) return;
+            const item = target.closest('.secretary-item');
+            if (!item) return;
+            if (document.querySelectorAll('#secretaryList .secretary-item').length < 2) return;
+            secDragReset();
+            secDrag = { item: item, startX: x, startY: y, lastY: y, active: false, timer: null };
+            secDrag.timer = setTimeout(secDragActivate, SEC_LONG_PRESS_MS);
+        }
+
+        function secDragActivate() {
+            if (!secDrag) return;
+            secDrag.timer = null;
+            secDrag.active = true;
+            secDrag.item.classList.add('sec-dragging');
+            document.body.classList.add('sec-no-select');
+            const sel = window.getSelection && window.getSelection();
+            if (sel) sel.removeAllRanges();
+            if (navigator.vibrate) { try { navigator.vibrate(30); } catch (err) {} }
+            secAutoScrollTimer = setInterval(secAutoScroll, 16);
+        }
+
+        function secOnMove(x, y) {
+            if (!secDrag) return;
+            if (!secDrag.active) {
+                // 還沒進入拖曳就移動太多 → 視為一般捲動，取消長按
+                if (Math.abs(x - secDrag.startX) > SEC_MOVE_TOLERANCE || Math.abs(y - secDrag.startY) > SEC_MOVE_TOLERANCE) secDragReset();
+                return;
+            }
+            secDrag.lastY = y;
+            secReorderByY(y);
+        }
+
+        function secReorderByY(y) {
+            if (!secDrag || !secDrag.active) return;
+            const list = document.getElementById('secretaryList');
+            const dragged = secDrag.item;
+            const others = Array.from(list.querySelectorAll('.secretary-item')).filter(el => el !== dragged);
+            let before = null;
+            for (const el of others) {
+                const r = el.getBoundingClientRect();
+                if (y < r.top + r.height / 2) { before = el; break; }
+            }
+            if (before) {
+                if (dragged.nextElementSibling !== before) list.insertBefore(dragged, before);
+            } else if (others.length > 0) {
+                const last = others[others.length - 1];
+                if (last.nextElementSibling !== dragged) list.insertBefore(dragged, last.nextSibling);
+            }
+        }
+
+        function secAutoScroll() {
+            if (!secDrag || !secDrag.active) return;
+            const header = document.getElementById('mainHeader');
+            const topEdge = (header && header.style.display !== 'none' ? header.getBoundingClientRect().bottom : 0) + 30;
+            const bottomEdge = window.innerHeight - 60;
+            const y = secDrag.lastY;
+            let dy = 0;
+            if (y < topEdge) dy = -10;
+            else if (y > bottomEdge) dy = 10;
+            if (dy !== 0) {
+                window.scrollBy(0, dy);
+                secReorderByY(y);
+            }
+        }
+
+        function secDragReset() {
+            if (!secDrag) return;
+            if (secDrag.timer) clearTimeout(secDrag.timer);
+            if (secAutoScrollTimer) { clearInterval(secAutoScrollTimer); secAutoScrollTimer = null; }
+            secDrag.item.classList.remove('sec-dragging');
+            document.body.classList.remove('sec-no-select');
+            secDrag = null;
+        }
+
+        function secOnRelease() {
+            if (!secDrag) return;
+            const wasActive = secDrag.active;
+            if (wasActive) {
+                const ids = Array.from(document.querySelectorAll('#secretaryList .secretary-item')).map(el => el.dataset.id);
+                secretaryOrder = ids;
+                dbSettings.child('secretaryOrder').set(ids);
+            }
+            secDragReset();
+            if (wasActive) renderSecretaryList();
+        }
+
+        function initSecretaryDrag() {
+            const list = document.getElementById('secretaryList');
+
+            list.addEventListener('touchstart', (e) => {
+                secLastTouchTime = Date.now();
+                if (e.touches.length !== 1) { secDragReset(); return; }
+                const t = e.touches[0];
+                secOnPress(e, t.clientX, t.clientY);
+            }, { passive: true });
+            list.addEventListener('touchmove', (e) => {
+                secLastTouchTime = Date.now();
+                if (!secDrag) return;
+                if (secDrag.active && e.cancelable) e.preventDefault(); // 拖曳中不要讓頁面跟著捲動
+                const t = e.touches[0];
+                secOnMove(t.clientX, t.clientY);
+            }, { passive: false });
+            list.addEventListener('touchend', () => { secLastTouchTime = Date.now(); secOnRelease(); });
+            list.addEventListener('touchcancel', () => { secLastTouchTime = Date.now(); secOnRelease(); });
+
+            list.addEventListener('mousedown', (e) => {
+                if (e.button !== 0 || Date.now() - secLastTouchTime < 800) return; // 略過觸控後瀏覽器補發的滑鼠事件
+                secOnPress(e, e.clientX, e.clientY);
+            });
+            window.addEventListener('mousemove', (e) => secOnMove(e.clientX, e.clientY));
+            window.addEventListener('mouseup', secOnRelease);
+
+            // 長按時不要跳出系統選單
+            list.addEventListener('contextmenu', (e) => { if (secDrag) e.preventDefault(); });
+        }
+        initSecretaryDrag();
 
         function renderCategorySelects() {
             const mainSelect = document.getElementById('noteCategory');
@@ -1897,9 +2095,11 @@
         function parseTodoListHtml(contentHtml, noteId) {
             const lines = contentHtml.split('\n');
             let hasTodo = false;
+            const isTodoLine = [];
             const parsedLines = lines.map((line, index) => {
                 if (line.includes('□ ') || line.includes('■ ')) {
                     hasTodo = true;
+                    isTodoLine[index] = true;
                     const isChecked = line.includes('■ ');
                     const cleanText = line.replace('□ ', '').replace('■ ', '');
                     const completedClass = isChecked ? 'todo-completed' : '';
@@ -1911,7 +2111,9 @@
                 }
                 return index === 0 ? `<span class="first-line-bold">${line}</span>` : line;
             });
-            return hasTodo ? parsedLines.join('') : parsedLines.join('\n');
+            if (!hasTodo) return parsedLines.join('\n');
+            // 有核取方塊時，一般文字行補上換行，避免多行文字黏在一起
+            return parsedLines.map((p, i) => (isTodoLine[i] || p === '') ? p : p + '\n').join('');
         }
 
         function toggleTodoItemStatus(noteId, lineIndex, isChecked) {
@@ -1992,7 +2194,7 @@
 
                 let finalBodyHtml, ytHtml = '';
                 if (note.richText) {
-                    finalBodyHtml = sanitizeRichHtml(note.content);
+                    finalBodyHtml = boldFirstLineRich(sanitizeRichHtml(note.content));
                 } else {
                     const highlightedContent = highlightText(note.content, searchFilterText);
                     const linkResult = processContentLinks(highlightedContent);
