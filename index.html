@@ -470,6 +470,56 @@
         /* 個人秘書收合時：每筆只顯示第一行，其餘隱藏（點 🔽 展開看全部） */
         #secretaryList.secretary-collapsed .secretary-content,
         #secretaryList.secretary-collapsed .secretary-content.rich { white-space: pre; max-height: 1.5em; overflow: hidden; text-overflow: ellipsis; }
+
+        /* ===== 新增視窗：依分類切換工具列＋手寫畫圖 ===== */
+        /* 非 Secretary：工具列獨佔整列 */
+        .reminder-row-inner.with-toolbar.mode-note .rich-toolbar { width: 100%; flex-wrap: wrap; }
+        .rich-toolbar .draw-toggle-btn { font-size: 15px; }
+        /* 手寫模式：工具列只留下「切換」按鈕 */
+        .rich-toolbar.draw-mode > button:not(.draw-toggle-btn) { display: none; }
+        /* 手寫內容很高時，輸入視窗可捲動 */
+        #inputModal .modal-content { max-height: 92vh; overflow-y: auto; }
+
+        .draw-panel { margin-bottom: 10px; display: flex; flex-direction: column; gap: 6px; }
+        .draw-shape-wrap { position: relative; display: inline-block; }
+        .draw-shape-menu { position: absolute; top: 34px; left: 0; display: none; gap: 4px; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 5px; box-shadow: 0 4px 14px rgba(0,0,0,0.3); z-index: 20; }
+        .draw-shape-menu.open { display: flex; }
+        .draw-shape-menu .draw-tool-btn { font-size: 18px; }
+        .draw-recent-colors { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; min-height: 0; }
+        .draw-recent-label { font-size: 11px; color: var(--text-secondary); }
+        .draw-recent-swatch { width: 22px; height: 22px; padding: 0; border-radius: 4px; border: 1px solid var(--border-color); cursor: pointer; flex-shrink: 0; }
+        .draw-recent-swatch.current { outline: 2px solid var(--primary-color); outline-offset: 1px; }
+        .draw-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+        .draw-tool-btn {
+            min-width: 32px; height: 30px; padding: 0 6px;
+            border: 1px solid var(--border-color); border-radius: 6px;
+            background: var(--input-bg); color: var(--text-color);
+            font-size: 14px; cursor: pointer;
+        }
+        .draw-tool-btn.active { background: var(--primary-color); color: #fff; border-color: var(--primary-color); }
+        .draw-tool-btn:active { opacity: 0.7; }
+        .draw-color-input { width: 32px; height: 30px; padding: 0; border: 1px solid var(--border-color); border-radius: 6px; background: none; cursor: pointer; }
+        .draw-width-wrap { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-secondary); }
+        .draw-width-wrap input[type=range] { width: 72px; }
+        .draw-fill-label { display: flex; align-items: center; gap: 3px; font-size: 12px; color: var(--text-color); cursor: pointer; }
+        #drawCanvas {
+            display: block; width: 100%; height: 200px; margin-top: 8px;
+            background: #fff; border: 1px solid var(--border-color); border-radius: 8px;
+            touch-action: none; cursor: crosshair;
+        }
+        /* 手寫圖片在內容中的顯示大小 */
+        .note-img.inline-note-img.inline-draw-img { width: auto; max-width: 100%; height: auto; object-fit: contain; border-radius: 6px; vertical-align: middle; }
+
+        /* 手機：手寫模式滿版 */
+        @media (max-width: 600px) {
+            #drawPanel {
+                position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+                z-index: 250; margin: 0; padding: 10px;
+                padding-bottom: max(10px, env(safe-area-inset-bottom));
+                box-sizing: border-box; background: var(--card-bg);
+            }
+            #drawCanvas { flex: 1 1 0; height: 0; min-height: 120px; margin-top: 0; }
+        }
     </style>
 </head>
 <body>
@@ -543,8 +593,9 @@
                         <button type="button" id="inputTextColorBtn" class="color-swatch-btn" onclick="openColorPanel(this, 'color', 'noteContent')">A<span class="color-bar" id="inputTextColorBar"></span></button>
                         <button type="button" id="inputBgColorBtn" class="color-swatch-btn" onclick="openColorPanel(this, 'backgroundColor', 'noteContent')">A<span class="color-bar" id="inputBgColorBar"></span></button>
                         <button type="button" class="numbering-trigger-btn" onclick="openNumberingPanel(this, 'noteContent')">№</button>
+                        <button type="button" id="drawToggleBtn" class="draw-toggle-btn" onclick="toggleDrawMode()" title="切換：輸入文字／手寫畫圖">✏️</button>
                     </div>
-                    <div class="reminder-col">
+                    <div class="reminder-col" id="inputReminderCol">
                         <div class="reminder-group">
                             <span class="reminder-label">⏰主要通知</span>
                             <input type="datetime-local" id="inputRemindAt" class="reminder-datetime">
@@ -570,6 +621,40 @@
             </div>
 
             <div id="noteContent" class="input-style rich-content" contenteditable="true" style="margin-bottom:10px; overflow-y:auto;" data-placeholder="輸入內容" onfocus="document.execCommand('defaultParagraphSeparator', false, 'br')" onpaste="handleRichPaste(event)" oninput="handleSuggest('content')" onkeydown="handleListEnterKey(event, 'noteContent')"></div>
+
+            <!-- 手寫畫圖面板（點工具列的 ✏️／⌨️ 切換） -->
+            <div id="drawPanel" class="draw-panel" style="display:none;">
+                <div class="draw-tools">
+                    <button type="button" class="draw-tool-btn" onclick="exitDrawMode()" title="回到文字輸入">⌨️ 文字</button>
+                    <button type="button" class="draw-tool-btn active" data-tool="pen" onclick="setDrawTool('pen')" title="自由線條">✏️</button>
+                    <button type="button" class="draw-tool-btn" data-tool="eraser" onclick="setDrawTool('eraser')" title="橡皮擦">🧽</button>
+                    <button type="button" class="draw-tool-btn" data-tool="line" onclick="setDrawTool('line')" title="直線">╱</button>
+                    <div class="draw-shape-wrap">
+                        <button type="button" class="draw-tool-btn" id="drawShapeBtn" onclick="toggleDrawShapeMenu()" title="圖形（點開選擇）">▭▾</button>
+                        <div class="draw-shape-menu" id="drawShapeMenu">
+                            <button type="button" class="draw-tool-btn active" data-shape="rect" onclick="setDrawTool('rect')" title="四方形">▭</button>
+                            <button type="button" class="draw-tool-btn" data-shape="circle" onclick="setDrawTool('circle')" title="圓形／橢圓">◯</button>
+                            <button type="button" class="draw-tool-btn" data-shape="triangle" onclick="setDrawTool('triangle')" title="三角形">△</button>
+                            <button type="button" class="draw-tool-btn" data-shape="pentagon" onclick="setDrawTool('pentagon')" title="五角形">⬠</button>
+                            <button type="button" class="draw-tool-btn" data-shape="hexagon" onclick="setDrawTool('hexagon')" title="六角形">⬡</button>
+                        </div>
+                    </div>
+                                        <button type="button" class="draw-tool-btn" id="drawLockBtn" onclick="toggleDrawProportional()" title="等比例（電腦版也可按住 Shift）">🔒 等比</button>
+                </div>
+                <div class="draw-tools" style="margin-top:6px;">
+                    <input type="color" id="drawColor" class="draw-color-input" value="#000000" title="線條／填滿顏色" onchange="onDrawColorChange()">
+                    <div class="draw-width-wrap">粗細
+                        <input type="range" id="drawWidth" min="1" max="30" value="4" oninput="document.getElementById('drawWidthLabel').innerText = this.value">
+                        <span id="drawWidthLabel">4</span>
+                    </div>
+                    <label class="draw-fill-label"><input type="checkbox" id="drawFill">填滿</label>
+                    <button type="button" class="draw-tool-btn" onclick="drawUndo()" title="復原">↶</button>
+                    <button type="button" class="draw-tool-btn" onclick="drawClear()" title="清除畫布">🗑️</button>
+                </div>
+                <div class="draw-recent-colors" id="drawRecentColors"></div>
+                <canvas id="drawCanvas"></canvas>
+                <button type="button" class="unified-btn" id="drawInsertBtn" style="width:100%; height:36px; margin-top:8px;" onclick="insertDrawingToContent()">＋ 插入圖片到內容</button>
+            </div>
 
             <div id="inputExtraFieldsWrapper">
                 <input type="text" id="noteKeywords" class="input-style" style="height: 32px; margin-bottom:8px;" placeholder="關鍵字" onkeydown="handleKeywordsKeydown(event)" oninput="handleSuggest('keywords')">
@@ -960,6 +1045,7 @@
             tempImages = [];
             document.getElementById('preview-area').innerHTML = '';
             document.getElementById('suggestionBox').innerHTML = '';
+            resetDrawState();
             updateInputCategoryMode();
             document.getElementById('inputModal').style.display = 'flex';
             document.getElementById('noteContent').focus();
@@ -969,14 +1055,25 @@
             document.getElementById('inputModal').style.display = 'none';
         }
 
+        // 選「Secretary」→ 只顯示主要／提前通知；選其它（含未選）→ 只顯示文字格式工具＋手寫切換鈕
         function updateInputCategoryMode() {
             const isSecretary = document.getElementById('noteCategory').value === 'Secretary';
             const wrapper = document.getElementById('inputExtraFieldsWrapper');
             wrapper.style.display = isSecretary ? 'none' : 'block';
             document.getElementById('inputRichToolbar').style.display = isSecretary ? 'none' : 'flex';
+            document.getElementById('inputReminderCol').style.display = isSecretary ? 'flex' : 'none';
+            const rowInner = document.querySelector('#inputModal .reminder-row-inner');
+            if (rowInner) rowInner.classList.toggle('mode-note', !isSecretary);
             if (isSecretary) {
+                exitDrawMode();
                 document.getElementById('noteKeywords').value = '';
                 document.getElementById('suggestionBox').innerHTML = '';
+            } else {
+                // 非 Secretary 不使用通知功能，清空避免殘留
+                document.getElementById('inputRemindAt').value = '';
+                document.getElementById('inputRepeat').value = 'none';
+                document.getElementById('inputExtraRemindAt').value = '';
+                document.getElementById('inputExtraRepeat').value = 'none';
             }
         }
 
@@ -998,6 +1095,419 @@
             e.preventDefault();
             const text = (e.clipboardData || window.clipboardData).getData('text/plain');
             document.execCommand('insertText', false, text);
+        }
+
+        // ===== 手寫畫圖（新增視窗專用）=====
+        let inputDrawMode = false;
+        let drawTool = 'pen';
+        let drawing = false;
+        let drawStartPt = null;
+        let drawLastPt = null;
+        let drawSnapshot = null;
+        let drawUndoStack = [];
+        let drawDirty = false;
+        let drawNeedsInit = true;
+        let drawSavedRange = null;   // 切換到手寫前，文字游標所在位置（圖片會插入到這裡）
+
+        function resetDrawState() {
+            exitDrawMode();
+            drawUndoStack = [];
+            drawDirty = false;
+            drawNeedsInit = true;
+            drawSavedRange = null;
+            drawing = false;
+            const btn = document.getElementById('drawInsertBtn');
+            if (btn) { btn.disabled = false; btn.innerText = '＋ 插入圖片到內容'; }
+        }
+
+        function toggleDrawMode() {
+            if (inputDrawMode) exitDrawMode(); else enterDrawMode();
+        }
+
+        function enterDrawMode() {
+            if (inputDrawMode) return;
+            const el = document.getElementById('noteContent');
+            const sel = window.getSelection();
+            drawSavedRange = null;
+            if (sel.rangeCount > 0 && el.contains(sel.getRangeAt(0).startContainer)) {
+                const r = sel.getRangeAt(0).cloneRange();
+                r.collapse(false);
+                drawSavedRange = r;
+            }
+            inputDrawMode = true;
+            el.style.display = 'none';
+            document.getElementById('drawPanel').style.display = 'flex';
+            renderDrawRecentColors();
+            document.getElementById('inputRichToolbar').classList.add('draw-mode');
+            document.getElementById('drawToggleBtn').innerText = '⌨️';
+            if (drawNeedsInit || !drawDirty) setupDrawCanvas();
+        }
+
+        function exitDrawMode() {
+            const el = document.getElementById('noteContent');
+            if (el) el.style.display = '';
+            const panel = document.getElementById('drawPanel');
+            if (panel) panel.style.display = 'none';
+            const tb = document.getElementById('inputRichToolbar');
+            if (tb) tb.classList.remove('draw-mode');
+            const tgl = document.getElementById('drawToggleBtn');
+            if (tgl) tgl.innerText = '✏️';
+            closeDrawShapeMenu();
+            inputDrawMode = false;
+        }
+
+        function setupDrawCanvas() {
+            const c = document.getElementById('drawCanvas');
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            const w = Math.max(200, Math.floor(c.clientWidth));
+            const h = Math.max(100, Math.floor(c.clientHeight));
+            c.width = Math.floor(w * dpr);
+            c.height = Math.floor(h * dpr);
+            const ctx = c.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, c.width, c.height);
+            drawUndoStack = [];
+            drawDirty = false;
+            drawNeedsInit = false;
+        }
+
+        const DRAW_SHAPES = { rect: '▭', circle: '◯', triangle: '△', pentagon: '⬠', hexagon: '⬡' };
+        let drawProportional = false;   // 手機用的「等比例」開關（電腦版可直接按住 Shift）
+
+        function setDrawTool(tool) {
+            drawTool = tool;
+            document.querySelectorAll('#drawPanel .draw-tool-btn[data-tool]').forEach(b => {
+                b.classList.toggle('active', b.dataset.tool === tool);
+            });
+            const isShape = !!DRAW_SHAPES[tool];
+            const shapeBtn = document.getElementById('drawShapeBtn');
+            if (shapeBtn) {
+                shapeBtn.classList.toggle('active', isShape);
+                if (isShape) shapeBtn.innerText = DRAW_SHAPES[tool] + '▾';
+            }
+            document.querySelectorAll('#drawShapeMenu .draw-tool-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.shape === tool);
+            });
+            closeDrawShapeMenu();
+        }
+
+        function toggleDrawShapeMenu() {
+            document.getElementById('drawShapeMenu').classList.toggle('open');
+        }
+        function closeDrawShapeMenu() {
+            const m = document.getElementById('drawShapeMenu');
+            if (m) m.classList.remove('open');
+        }
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.draw-shape-wrap')) closeDrawShapeMenu();
+        });
+
+        function toggleDrawProportional() {
+            drawProportional = !drawProportional;
+            document.getElementById('drawLockBtn').classList.toggle('active', drawProportional);
+        }
+
+        // 等比例：圖形變成正方形範圍（圓→正圓、五／六角形→正多邊形）；直線則吸附到 45° 倍數
+        function drawConstrainPoint(a, p, tool) {
+            const dx = p.x - a.x, dy = p.y - a.y;
+            if (tool === 'line') {
+                const step = Math.PI / 4;
+                const snap = Math.round(Math.atan2(dy, dx) / step) * step;
+                const len = Math.hypot(dx, dy);
+                return { x: a.x + len * Math.cos(snap), y: a.y + len * Math.sin(snap) };
+            }
+            const s = Math.max(Math.abs(dx), Math.abs(dy));
+            return { x: a.x + (dx < 0 ? -s : s), y: a.y + (dy < 0 ? -s : s) };
+        }
+
+        // 最近使用的繪圖顏色（最多保留 12 組）
+        function getDrawRecentColors() {
+            try { return JSON.parse(localStorage.getItem('drawRecentColors') || '[]'); } catch (e) { return []; }
+        }
+        function addDrawRecentColor(hex) {
+            if (!hex) return;
+            const recent = getDrawRecentColors();
+            if (!recent.some(c => c.toLowerCase() === hex.toLowerCase())) {
+                recent.unshift(hex);
+                try { localStorage.setItem('drawRecentColors', JSON.stringify(recent.slice(0, 12))); } catch (e) {}
+            }
+            renderDrawRecentColors();
+        }
+        function renderDrawRecentColors() {
+            const row = document.getElementById('drawRecentColors');
+            if (!row) return;
+            const recent = getDrawRecentColors();
+            const current = (document.getElementById('drawColor').value || '').toLowerCase();
+            row.innerHTML = '';
+            if (recent.length === 0) return;
+            const label = document.createElement('span');
+            label.className = 'draw-recent-label';
+            label.innerText = '最近';
+            row.appendChild(label);
+            recent.forEach(c => {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'draw-recent-swatch' + (c.toLowerCase() === current ? ' current' : '');
+                b.style.background = c;
+                b.title = c;
+                b.onclick = () => { document.getElementById('drawColor').value = c; renderDrawRecentColors(); };
+                row.appendChild(b);
+            });
+        }
+        function onDrawColorChange() {
+            addDrawRecentColor(document.getElementById('drawColor').value);
+        }
+        renderDrawRecentColors();
+
+        // 裁掉四周空白，只留下實際畫到的範圍（外加一點邊距）
+        function getCroppedDrawingCanvas() {
+            const c = document.getElementById('drawCanvas');
+            const ctx = c.getContext('2d');
+            const w = c.width, h = c.height;
+            const scale = c.width / c.getBoundingClientRect().width;
+            const data = ctx.getImageData(0, 0, w, h).data;
+            let minX = w, minY = h, maxX = -1, maxY = -1;
+            for (let y = 0; y < h; y++) {
+                const rowStart = y * w * 4;
+                for (let x = 0; x < w; x++) {
+                    const i = rowStart + x * 4;
+                    if (data[i] < 250 || data[i + 1] < 250 || data[i + 2] < 250) {
+                        if (x < minX) minX = x;
+                        if (x > maxX) maxX = x;
+                        if (y < minY) minY = y;
+                        if (y > maxY) maxY = y;
+                    }
+                }
+            }
+            if (maxX < 0) return { canvas: c, cssWidth: Math.round(w / scale) };
+            const pad = Math.round(8 * scale);
+            minX = Math.max(0, minX - pad);
+            minY = Math.max(0, minY - pad);
+            maxX = Math.min(w - 1, maxX + pad);
+            maxY = Math.min(h - 1, maxY + pad);
+            const cw = maxX - minX + 1, ch = maxY - minY + 1;
+            const out = document.createElement('canvas');
+            out.width = cw;
+            out.height = ch;
+            const octx = out.getContext('2d');
+            octx.fillStyle = '#ffffff';
+            octx.fillRect(0, 0, cw, ch);
+            octx.drawImage(c, minX, minY, cw, ch, 0, 0, cw, ch);
+            return { canvas: out, cssWidth: Math.round(cw / scale) };
+        }
+
+        function drawPushUndo() {
+            const c = document.getElementById('drawCanvas');
+            const ctx = c.getContext('2d');
+            drawUndoStack.push(ctx.getImageData(0, 0, c.width, c.height));
+            if (drawUndoStack.length > 30) drawUndoStack.shift();
+        }
+
+        function drawUndo() {
+            if (drawUndoStack.length === 0) return;
+            const c = document.getElementById('drawCanvas');
+            c.getContext('2d').putImageData(drawUndoStack.pop(), 0, 0);
+            if (drawUndoStack.length === 0) drawDirty = false;
+        }
+
+        function drawClear() {
+            const c = document.getElementById('drawCanvas');
+            const ctx = c.getContext('2d');
+            drawPushUndo();
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, c.width, c.height);
+        }
+
+        function drawGetPoint(e) {
+            const c = document.getElementById('drawCanvas');
+            const r = c.getBoundingClientRect();
+            return {
+                x: (e.clientX - r.left) * (c.width / r.width),
+                y: (e.clientY - r.top) * (c.height / r.height)
+            };
+        }
+
+        function drawApplyStyle(ctx) {
+            const c = ctx.canvas;
+            const r = c.getBoundingClientRect();
+            const scale = c.width / r.width;
+            const color = document.getElementById('drawColor').value;
+            const width = parseInt(document.getElementById('drawWidth').value, 10) || 4;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            if (drawTool === 'eraser') {
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = width * 2 * scale;
+            } else {
+                ctx.strokeStyle = color;
+                ctx.fillStyle = color;
+                ctx.lineWidth = width * scale;
+            }
+        }
+
+        function drawShape(ctx, tool, a, b) {
+            ctx.beginPath();
+            if (tool === 'line') {
+                ctx.moveTo(a.x, a.y);
+                ctx.lineTo(b.x, b.y);
+            } else if (tool === 'rect') {
+                ctx.rect(a.x, a.y, b.x - a.x, b.y - a.y);
+            } else if (tool === 'circle') {
+                ctx.ellipse((a.x + b.x) / 2, (a.y + b.y) / 2, Math.abs(b.x - a.x) / 2, Math.abs(b.y - a.y) / 2, 0, 0, Math.PI * 2);
+            } else if (tool === 'triangle') {
+                ctx.moveTo((a.x + b.x) / 2, a.y);
+                ctx.lineTo(b.x, b.y);
+                ctx.lineTo(a.x, b.y);
+                ctx.closePath();
+            } else if (tool === 'pentagon' || tool === 'hexagon') {
+                const n = tool === 'pentagon' ? 5 : 6;
+                const cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2;
+                const rx = Math.abs(b.x - a.x) / 2, ry = Math.abs(b.y - a.y) / 2;
+                for (let k = 0; k < n; k++) {
+                    const ang = -Math.PI / 2 + k * 2 * Math.PI / n;
+                    const px = cx + rx * Math.cos(ang), py = cy + ry * Math.sin(ang);
+                    if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+                }
+                ctx.closePath();
+            }
+            if (tool !== 'line' && document.getElementById('drawFill').checked) ctx.fill();
+            ctx.stroke();
+        }
+
+        function drawPointerDown(e) {
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
+            e.preventDefault();
+            const c = document.getElementById('drawCanvas');
+            const ctx = c.getContext('2d');
+            try { c.setPointerCapture(e.pointerId); } catch (err) {}
+            drawPushUndo();
+            drawSnapshot = drawUndoStack[drawUndoStack.length - 1];
+            drawing = true;
+            drawDirty = true;
+            drawStartPt = drawGetPoint(e);
+            closeDrawShapeMenu();
+            if (drawTool !== 'eraser') addDrawRecentColor(document.getElementById('drawColor').value);
+            drawLastPt = drawStartPt;
+            drawApplyStyle(ctx);
+            if (drawTool === 'pen' || drawTool === 'eraser') {
+                ctx.beginPath();
+                ctx.moveTo(drawStartPt.x, drawStartPt.y);
+                ctx.lineTo(drawStartPt.x + 0.01, drawStartPt.y + 0.01);
+                ctx.stroke();
+            }
+        }
+
+        function drawPointerMove(e) {
+            if (!drawing) return;
+            e.preventDefault();
+            const c = document.getElementById('drawCanvas');
+            const ctx = c.getContext('2d');
+            let p = drawGetPoint(e);
+            if (drawTool !== 'pen' && drawTool !== 'eraser' && (e.shiftKey || drawProportional)) {
+                p = drawConstrainPoint(drawStartPt, p, drawTool);
+            }
+            if (drawTool === 'pen' || drawTool === 'eraser') {
+                ctx.beginPath();
+                ctx.moveTo(drawLastPt.x, drawLastPt.y);
+                ctx.lineTo(p.x, p.y);
+                ctx.stroke();
+                drawLastPt = p;
+            } else {
+                ctx.putImageData(drawSnapshot, 0, 0);
+                drawApplyStyle(ctx);
+                drawShape(ctx, drawTool, drawStartPt, p);
+            }
+        }
+
+        function drawPointerUp(e) {
+            if (!drawing) return;
+            drawing = false;
+            try { document.getElementById('drawCanvas').releasePointerCapture(e.pointerId); } catch (err) {}
+        }
+
+        (function initDrawCanvasEvents() {
+            const c = document.getElementById('drawCanvas');
+            c.addEventListener('pointerdown', drawPointerDown);
+            c.addEventListener('pointermove', drawPointerMove);
+            c.addEventListener('pointerup', drawPointerUp);
+            c.addEventListener('pointercancel', drawPointerUp);
+        })();
+
+        // 把畫好的圖上傳到 Cloudinary，再插入到文字內容中原本游標的位置
+        function insertDrawingToContent() {
+            if (!drawDirty) { alert('請先畫點東西'); return; }
+            const c = document.getElementById('drawCanvas');
+            const btn = document.getElementById('drawInsertBtn');
+            btn.disabled = true;
+            btn.innerText = '⏳ 上傳中...';
+            const cropped = getCroppedDrawingCanvas();
+            const cssW = cropped.cssWidth;
+            cropped.canvas.toBlob(async function(blob) {
+                if (!blob) {
+                    btn.disabled = false;
+                    btn.innerText = '＋ 插入圖片到內容';
+                    alert('圖片產生失敗');
+                    return;
+                }
+                const cloudName = 'keloftva';
+                const uploadPreset = 'ml_default';
+                const formData = new FormData();
+                formData.append('file', blob, 'drawing.png');
+                formData.append('upload_preset', uploadPreset);
+                try {
+                    const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const result = await response.json();
+                    if (result.secure_url) {
+                        exitDrawMode();
+                        insertDrawingImage(result.secure_url, cssW);
+                        drawSavedRange = null;
+                        drawNeedsInit = true;   // 下次進入手寫會是全新的空白畫布
+                        drawDirty = false;
+                        drawUndoStack = [];
+                    } else {
+                        alert('上傳失敗：' + (result.error ? result.error.message : '未知錯誤'));
+                    }
+                } catch (err) {
+                    alert('上傳發生錯誤：' + err.message);
+                } finally {
+                    btn.disabled = false;
+                    btn.innerText = '＋ 插入圖片到內容';
+                }
+            }, 'image/png');
+        }
+
+        function insertDrawingImage(url, cssWidth) {
+            const el = document.getElementById('noteContent');
+            el.focus();
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            let range;
+            if (drawSavedRange && el.contains(drawSavedRange.startContainer)) {
+                range = drawSavedRange;
+            } else {
+                range = document.createRange();
+                range.selectNodeContents(el);
+                range.collapse(false);
+            }
+            sel.addRange(range);
+            range = sel.getRangeAt(0);
+            range.deleteContents();
+            const img = document.createElement('img');
+            img.src = url;
+            img.setAttribute('data-draw', '1');
+            img.className = 'note-img inline-note-img inline-draw-img';
+            if (cssWidth > 0) {
+                img.setAttribute('data-w', String(cssWidth));
+                img.style.width = cssWidth + 'px';
+            }
+            range.insertNode(img);
+            range.setStartAfter(img);
+            range.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(range);
         }
 
         // ===== Phase 2：文字顏色／背景色／清除格式 =====
@@ -1142,7 +1652,7 @@
         function addRecentColor(hex) {
             let recent = getRecentColors().filter(c => c.toLowerCase() !== hex.toLowerCase());
             recent.unshift(hex);
-            localStorage.setItem('richTextRecentColors', JSON.stringify(recent.slice(0, 8)));
+            localStorage.setItem('richTextRecentColors', JSON.stringify(recent.slice(0, 12)));
         }
         function renderRecentColors() {
             const recent = getRecentColors();
@@ -1498,6 +2008,8 @@
                             // 保留
                         } else if (child.tagName === 'IMG' && attr.name === 'src') {
                             // 保留
+                        } else if (child.tagName === 'IMG' && (attr.name === 'data-draw' || attr.name === 'data-w')) {
+                            // 保留（手寫圖片標記）
                         } else {
                             child.removeAttribute(attr.name);
                         }
@@ -1509,7 +2021,9 @@
                     if (child.tagName === 'IMG') {
                         const src = child.getAttribute('src') || '';
                         if (!/^https?:\/\//i.test(src)) { node.removeChild(child); return; }
-                        child.setAttribute('class', 'note-img inline-note-img');
+                        child.setAttribute('class', child.getAttribute('data-draw') ? 'note-img inline-note-img inline-draw-img' : 'note-img inline-note-img');
+                        const drawW = parseInt(child.getAttribute('data-w'), 10);
+                        if (child.getAttribute('data-draw') && drawW > 0) child.setAttribute('style', 'width:' + Math.min(drawW, 2000) + 'px;');
                     }
                     clean(child);
                 });
@@ -2376,8 +2890,9 @@
             const id = Date.now().toString();
             const noteData = { id, content, keywords, category, images: allImages, time: new Date().toLocaleString(), isPinned: false, completed: false };
             if (!isSecretary) noteData.richText = true;
-            if (remindAt) { noteData.remindAt = remindAt; noteData.repeat = repeat; }
-            if (extraRemindAt) { noteData.extraRemindAt = extraRemindAt; noteData.extraRepeat = extraRepeat; }
+            // 只有 Secretary 才會有通知設定
+            if (isSecretary && remindAt) { noteData.remindAt = remindAt; noteData.repeat = repeat; }
+            if (isSecretary && extraRemindAt) { noteData.extraRemindAt = extraRemindAt; noteData.extraRepeat = extraRepeat; }
             db.child(id).set(noteData);
 
             document.getElementById('noteContent').innerHTML = '';
