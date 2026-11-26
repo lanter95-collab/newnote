@@ -640,16 +640,19 @@
                         </div>
                     </div>
                                         <button type="button" class="draw-tool-btn" id="drawLockBtn" onclick="toggleDrawProportional()" title="等比例（電腦版也可按住 Shift）">🔒 等比</button>
+                    <button type="button" class="draw-tool-btn" data-tool="select" onclick="setDrawTool('select')" title="選取已畫好的圖形，可移動、縮放、改顏色">👆 選取</button>
                 </div>
                 <div class="draw-tools" style="margin-top:6px;">
-                    <input type="color" id="drawColor" class="draw-color-input" value="#000000" title="線條／填滿顏色" onchange="onDrawColorChange()">
+                    <input type="color" id="drawColor" class="draw-color-input" value="#000000" title="線條顏色" oninput="onDrawStyleChange()" onchange="onDrawColorChange()">
                     <div class="draw-width-wrap">粗細
-                        <input type="range" id="drawWidth" min="1" max="30" value="4" oninput="document.getElementById('drawWidthLabel').innerText = this.value">
+                        <input type="range" id="drawWidth" min="1" max="30" value="4" oninput="onDrawWidthInput(this.value)">
                         <span id="drawWidthLabel">4</span>
                     </div>
-                    <label class="draw-fill-label"><input type="checkbox" id="drawFill">填滿</label>
+                    <label class="draw-fill-label"><input type="checkbox" id="drawFill" onchange="onDrawStyleChange()">填滿</label>
+                    <input type="color" id="drawFillColor" class="draw-color-input" value="#000000" title="填滿顏色" oninput="onDrawFillColorInput()">
                     <button type="button" class="draw-tool-btn" onclick="drawUndo()" title="復原">↶</button>
-                    <button type="button" class="draw-tool-btn" onclick="drawClear()" title="清除畫布">🗑️</button>
+                    <button type="button" class="draw-tool-btn" onclick="drawDeleteSelected()" title="刪除所選圖形">✖所選</button>
+                    <button type="button" class="draw-tool-btn" onclick="drawClear()" title="清除整張畫布">🗑️</button>
                 </div>
                 <div class="draw-recent-colors" id="drawRecentColors"></div>
                 <canvas id="drawCanvas"></canvas>
@@ -1098,24 +1101,43 @@
         }
 
         // ===== 手寫畫圖（新增視窗專用）=====
+        // 每一筆線條／圖形都以「物件」保存（不是直接畫成點陣圖），所以畫完之後仍可用「選取」工具
+        // 重新編輯：移動、拉大縮小、改線條顏色、改填滿顏色、改粗細，並且可以復原。
         let inputDrawMode = false;
         let drawTool = 'pen';
         let drawing = false;
         let drawStartPt = null;
-        let drawLastPt = null;
-        let drawSnapshot = null;
-        let drawUndoStack = [];
-        let drawDirty = false;
         let drawNeedsInit = true;
         let drawSavedRange = null;   // 切換到手寫前，文字游標所在位置（圖片會插入到這裡）
 
+        let drawObjects = [];        // 已畫好的物件（由下往上疊）
+        let drawCurrent = null;      // 正在畫、尚未放開的物件
+        let drawSelected = null;     // 目前選取中的物件
+        let drawGesture = null;      // 選取模式下的拖移／縮放動作
+        let drawBefore = null;       // 每次動作開始前的快照（用於復原）
+        let drawUndoStack = [];
+        let drawFillLinked = true;   // 填滿顏色是否跟著線條顏色走（預設跟著，與舊版一樣）
+        let drawStyleEdit = { obj: null, time: 0 };
+
+        function drawClone(o) { return JSON.parse(JSON.stringify(o)); }
+        function drawSnapshot() { return JSON.stringify(drawObjects); }
+        function drawPushUndoState(snap) {
+            drawUndoStack.push(snap);
+            if (drawUndoStack.length > 40) drawUndoStack.shift();
+        }
+        function drawIsClosedShape(o) { return !!o && o.type !== 'pen' && o.type !== 'eraser' && o.type !== 'line'; }
+
         function resetDrawState() {
             exitDrawMode();
+            drawObjects = [];
+            drawCurrent = null;
+            drawSelected = null;
+            drawGesture = null;
             drawUndoStack = [];
-            drawDirty = false;
             drawNeedsInit = true;
             drawSavedRange = null;
             drawing = false;
+            drawFillLinked = true;
             const btn = document.getElementById('drawInsertBtn');
             if (btn) { btn.disabled = false; btn.innerText = '＋ 插入圖片到內容'; }
         }
@@ -1140,7 +1162,7 @@
             renderDrawRecentColors();
             document.getElementById('inputRichToolbar').classList.add('draw-mode');
             document.getElementById('drawToggleBtn').innerText = '⌨️';
-            if (drawNeedsInit || !drawDirty) setupDrawCanvas();
+            if (drawNeedsInit || drawObjects.length === 0) setupDrawCanvas(); else drawRedraw();
         }
 
         function exitDrawMode() {
@@ -1163,12 +1185,19 @@
             const h = Math.max(100, Math.floor(c.clientHeight));
             c.width = Math.floor(w * dpr);
             c.height = Math.floor(h * dpr);
-            const ctx = c.getContext('2d');
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, c.width, c.height);
+            drawObjects = [];
+            drawCurrent = null;
+            drawSelected = null;
+            drawGesture = null;
             drawUndoStack = [];
-            drawDirty = false;
             drawNeedsInit = false;
+            drawRedraw();
+        }
+
+        function drawScale() {
+            const c = document.getElementById('drawCanvas');
+            const r = c.getBoundingClientRect();
+            return r.width > 0 ? c.width / r.width : 1;
         }
 
         const DRAW_SHAPES = { rect: '▭', circle: '◯', triangle: '△', pentagon: '⬠', hexagon: '⬡' };
@@ -1189,6 +1218,8 @@
                 b.classList.toggle('active', b.dataset.shape === tool);
             });
             closeDrawShapeMenu();
+            document.getElementById('drawCanvas').style.cursor = (tool === 'select') ? 'default' : 'crosshair';
+            if (tool !== 'select' && drawSelected) { drawSelected = null; drawGesture = null; drawRedraw(); }
         }
 
         function toggleDrawShapeMenu() {
@@ -1250,7 +1281,7 @@
                 b.className = 'draw-recent-swatch' + (c.toLowerCase() === current ? ' current' : '');
                 b.style.background = c;
                 b.title = c;
-                b.onclick = () => { document.getElementById('drawColor').value = c; renderDrawRecentColors(); };
+                b.onclick = () => { document.getElementById('drawColor').value = c; renderDrawRecentColors(); onDrawStyleChange(); };
                 row.appendChild(b);
             });
         }
@@ -1259,65 +1290,346 @@
         }
         renderDrawRecentColors();
 
-        // 裁掉四周空白，只留下實際畫到的範圍（外加一點邊距）
-        function getCroppedDrawingCanvas() {
+        // ---------- 幾何計算（選取、點擊判斷、縮放用）----------
+        function drawBBox(o) {
+            if (o.type === 'pen' || o.type === 'eraser') {
+                let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+                o.pts.forEach(q => {
+                    if (q.x < x1) x1 = q.x;
+                    if (q.y < y1) y1 = q.y;
+                    if (q.x > x2) x2 = q.x;
+                    if (q.y > y2) y2 = q.y;
+                });
+                return { x1, y1, x2, y2 };
+            }
+            return { x1: Math.min(o.a.x, o.b.x), y1: Math.min(o.a.y, o.b.y), x2: Math.max(o.a.x, o.b.x), y2: Math.max(o.a.y, o.b.y) };
+        }
+
+        function drawShapeVertices(o) {
+            const b = drawBBox(o);
+            const cx = (b.x1 + b.x2) / 2, cy = (b.y1 + b.y2) / 2, rx = (b.x2 - b.x1) / 2, ry = (b.y2 - b.y1) / 2;
+            if (o.type === 'rect') return [{ x: b.x1, y: b.y1 }, { x: b.x2, y: b.y1 }, { x: b.x2, y: b.y2 }, { x: b.x1, y: b.y2 }];
+            if (o.type === 'triangle') return [{ x: cx, y: b.y1 }, { x: b.x2, y: b.y2 }, { x: b.x1, y: b.y2 }];
+            const n = o.type === 'pentagon' ? 5 : (o.type === 'hexagon' ? 6 : 48);
+            const start = (o.type === 'circle') ? 0 : -Math.PI / 2;
+            const pts = [];
+            for (let k = 0; k < n; k++) {
+                const ang = start + k * 2 * Math.PI / n;
+                pts.push({ x: cx + rx * Math.cos(ang), y: cy + ry * Math.sin(ang) });
+            }
+            return pts;
+        }
+
+        function drawDistToSeg(p, a, b) {
+            const dx = b.x - a.x, dy = b.y - a.y;
+            const len2 = dx * dx + dy * dy;
+            let t = len2 === 0 ? 0 : ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2;
+            t = Math.max(0, Math.min(1, t));
+            return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+        }
+
+        function drawPointInPolygon(p, poly) {
+            let inside = false;
+            for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+                const xi = poly[i].x, yi = poly[i].y, xj = poly[j].x, yj = poly[j].y;
+                if (((yi > p.y) !== (yj > p.y)) && (p.x < (xj - xi) * (p.y - yi) / (yj - yi) + xi)) inside = !inside;
+            }
+            return inside;
+        }
+
+        // 點在線條上（含容許誤差）；已填滿的圖形，點到內部也算
+        function drawHitTest(o, p, tol) {
+            const half = o.width / 2 + tol;
+            if (o.type === 'pen') {
+                if (o.pts.length === 1) return Math.hypot(p.x - o.pts[0].x, p.y - o.pts[0].y) <= half;
+                for (let i = 1; i < o.pts.length; i++) {
+                    if (drawDistToSeg(p, o.pts[i - 1], o.pts[i]) <= half) return true;
+                }
+                return false;
+            }
+            if (o.type === 'line') return drawDistToSeg(p, o.a, o.b) <= half;
+            const v = drawShapeVertices(o);
+            for (let i = 0; i < v.length; i++) {
+                if (drawDistToSeg(p, v[i], v[(i + 1) % v.length]) <= half) return true;
+            }
+            return !!o.fill && drawPointInPolygon(p, v);
+        }
+
+        function drawFindHit(p, s) {
+            for (let i = drawObjects.length - 1; i >= 0; i--) {
+                const o = drawObjects[i];
+                if (o.type === 'eraser') continue;
+                if (drawHitTest(o, p, 8 * s)) return o;
+            }
+            return null;
+        }
+
+        function drawGetHandles(o) {
+            if (o.type === 'line') return [{ id: 'p0', x: o.a.x, y: o.a.y }, { id: 'p1', x: o.b.x, y: o.b.y }];
+            const b = drawBBox(o);
+            const mx = (b.x1 + b.x2) / 2, my = (b.y1 + b.y2) / 2;
+            return [
+                { id: 'nw', x: b.x1, y: b.y1 }, { id: 'ne', x: b.x2, y: b.y1 },
+                { id: 'se', x: b.x2, y: b.y2 }, { id: 'sw', x: b.x1, y: b.y2 },
+                { id: 'n', x: mx, y: b.y1 }, { id: 'e', x: b.x2, y: my },
+                { id: 's', x: mx, y: b.y2 }, { id: 'w', x: b.x1, y: my }
+            ];
+        }
+
+        function drawHitHandle(o, p, r) {
+            const hs = drawGetHandles(o);
+            for (let i = 0; i < hs.length; i++) {
+                if (Math.abs(p.x - hs[i].x) <= r && Math.abs(p.y - hs[i].y) <= r) return hs[i];
+            }
+            return null;
+        }
+
+        function drawTranslate(o, orig, dx, dy) {
+            if (o.type === 'pen' || o.type === 'eraser') {
+                o.pts = orig.pts.map(q => ({ x: q.x + dx, y: q.y + dy }));
+            } else {
+                o.a = { x: orig.a.x + dx, y: orig.a.y + dy };
+                o.b = { x: orig.b.x + dx, y: orig.b.y + dy };
+            }
+        }
+
+        // 拖拉控制點縮放；keepRatio（Shift 或「🔒 等比」）時，四個角維持原本的長寬比
+        function drawResize(o, orig, id, p, keepRatio) {
+            if (o.type === 'line') {
+                if (id === 'p0') {
+                    const q = keepRatio ? drawConstrainPoint(orig.b, p, 'line') : p;
+                    o.a = { x: q.x, y: q.y };
+                } else {
+                    const q = keepRatio ? drawConstrainPoint(orig.a, p, 'line') : p;
+                    o.b = { x: q.x, y: q.y };
+                }
+                return;
+            }
+            const ob = drawBBox(orig);
+            const ow = ob.x2 - ob.x1, oh = ob.y2 - ob.y1;
+            let x1 = ob.x1, y1 = ob.y1, x2 = ob.x2, y2 = ob.y2;
+            if (keepRatio && id.length === 2 && ow > 0 && oh > 0) {
+                const fx = id.indexOf('w') >= 0 ? ob.x2 : ob.x1;
+                const fy = id.indexOf('n') >= 0 ? ob.y2 : ob.y1;
+                const dx = p.x - fx, dy = p.y - fy;
+                const k = Math.max(Math.abs(dx) / ow, Math.abs(dy) / oh);
+                const nx = fx + (dx < 0 ? -1 : 1) * ow * k;
+                const ny = fy + (dy < 0 ? -1 : 1) * oh * k;
+                if (id.indexOf('w') >= 0) { x2 = fx; x1 = nx; } else { x1 = fx; x2 = nx; }
+                if (id.indexOf('n') >= 0) { y2 = fy; y1 = ny; } else { y1 = fy; y2 = ny; }
+            } else {
+                if (id.indexOf('w') >= 0) x1 = p.x;
+                if (id.indexOf('e') >= 0) x2 = p.x;
+                if (id.indexOf('n') >= 0) y1 = p.y;
+                if (id.indexOf('s') >= 0) y2 = p.y;
+            }
+            if (o.type === 'pen' || o.type === 'eraser') {
+                o.pts = orig.pts.map(q => ({
+                    x: ow > 0.5 ? x1 + (q.x - ob.x1) * ((x2 - x1) / ow) : q.x,
+                    y: oh > 0.5 ? y1 + (q.y - ob.y1) * ((y2 - y1) / oh) : q.y
+                }));
+            } else {
+                o.a = { x: Math.min(x1, x2), y: Math.min(y1, y2) };
+                o.b = { x: Math.max(x1, x2), y: Math.max(y1, y2) };
+            }
+        }
+
+        // ---------- 繪製 ----------
+        function drawShapePath(ctx, tool, a, b) {
+            const x1 = Math.min(a.x, b.x), y1 = Math.min(a.y, b.y), x2 = Math.max(a.x, b.x), y2 = Math.max(a.y, b.y);
+            ctx.beginPath();
+            if (tool === 'rect') {
+                ctx.rect(x1, y1, x2 - x1, y2 - y1);
+            } else if (tool === 'circle') {
+                ctx.ellipse((x1 + x2) / 2, (y1 + y2) / 2, (x2 - x1) / 2, (y2 - y1) / 2, 0, 0, Math.PI * 2);
+            } else if (tool === 'triangle') {
+                ctx.moveTo((x1 + x2) / 2, y1);
+                ctx.lineTo(x2, y2);
+                ctx.lineTo(x1, y2);
+                ctx.closePath();
+            } else if (tool === 'pentagon' || tool === 'hexagon') {
+                const n = tool === 'pentagon' ? 5 : 6;
+                const cx = (x1 + x2) / 2, cy = (y1 + y2) / 2, rx = (x2 - x1) / 2, ry = (y2 - y1) / 2;
+                for (let k = 0; k < n; k++) {
+                    const ang = -Math.PI / 2 + k * 2 * Math.PI / n;
+                    const px = cx + rx * Math.cos(ang), py = cy + ry * Math.sin(ang);
+                    if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+                }
+                ctx.closePath();
+            }
+        }
+
+        // 把一個物件畫到 ctx 上（ox, oy 為位移，匯出裁切圖片時使用）
+        function drawRenderObject(ctx, o, ox, oy) {
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.lineWidth = o.width;
+            if (o.type === 'pen' || o.type === 'eraser') {
+                ctx.strokeStyle = (o.type === 'eraser') ? '#ffffff' : o.color;
+                ctx.beginPath();
+                ctx.moveTo(o.pts[0].x - ox, o.pts[0].y - oy);
+                if (o.pts.length === 1) {
+                    ctx.lineTo(o.pts[0].x - ox + 0.01, o.pts[0].y - oy + 0.01);
+                } else {
+                    for (let i = 1; i < o.pts.length; i++) ctx.lineTo(o.pts[i].x - ox, o.pts[i].y - oy);
+                }
+                ctx.stroke();
+                return;
+            }
+            const a = { x: o.a.x - ox, y: o.a.y - oy }, b = { x: o.b.x - ox, y: o.b.y - oy };
+            ctx.strokeStyle = o.color;
+            if (o.type === 'line') {
+                ctx.beginPath();
+                ctx.moveTo(a.x, a.y);
+                ctx.lineTo(b.x, b.y);
+                ctx.stroke();
+                return;
+            }
+            drawShapePath(ctx, o.type, a, b);
+            if (o.fill) { ctx.fillStyle = o.fillColor || o.color; ctx.fill(); }
+            ctx.stroke();
+        }
+
+        // 選取框與控制點（只畫在畫布上，不會被匯出到圖片）
+        function drawRenderSelection(ctx, o) {
+            const s = drawScale();
+            ctx.save();
+            ctx.lineWidth = 1.5 * s;
+            ctx.strokeStyle = '#007AFF';
+            if (o.type !== 'line') {
+                const b = drawBBox(o);
+                ctx.setLineDash([6 * s, 4 * s]);
+                ctx.strokeRect(b.x1, b.y1, b.x2 - b.x1, b.y2 - b.y1);
+                ctx.setLineDash([]);
+            }
+            const hs = 5 * s;
+            drawGetHandles(o).forEach(h => {
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.rect(h.x - hs, h.y - hs, hs * 2, hs * 2);
+                ctx.fill();
+                ctx.stroke();
+            });
+            ctx.restore();
+        }
+
+        function drawRedraw() {
             const c = document.getElementById('drawCanvas');
             const ctx = c.getContext('2d');
-            const w = c.width, h = c.height;
-            const scale = c.width / c.getBoundingClientRect().width;
-            const data = ctx.getImageData(0, 0, w, h).data;
-            let minX = w, minY = h, maxX = -1, maxY = -1;
-            for (let y = 0; y < h; y++) {
-                const rowStart = y * w * 4;
-                for (let x = 0; x < w; x++) {
-                    const i = rowStart + x * 4;
-                    if (data[i] < 250 || data[i + 1] < 250 || data[i + 2] < 250) {
-                        if (x < minX) minX = x;
-                        if (x > maxX) maxX = x;
-                        if (y < minY) minY = y;
-                        if (y > maxY) maxY = y;
-                    }
-                }
-            }
-            if (maxX < 0) return { canvas: c, cssWidth: Math.round(w / scale) };
-            const pad = Math.round(8 * scale);
-            minX = Math.max(0, minX - pad);
-            minY = Math.max(0, minY - pad);
-            maxX = Math.min(w - 1, maxX + pad);
-            maxY = Math.min(h - 1, maxY + pad);
-            const cw = maxX - minX + 1, ch = maxY - minY + 1;
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, c.width, c.height);
+            drawObjects.forEach(o => drawRenderObject(ctx, o, 0, 0));
+            if (drawCurrent) drawRenderObject(ctx, drawCurrent, 0, 0);
+            if (drawSelected && drawTool === 'select') drawRenderSelection(ctx, drawSelected);
+        }
+
+        // 裁掉四周空白，只留下實際畫到的範圍（外加一點邊距）；由向量物件重新繪製，不含選取框
+        function drawExportCanvas() {
+            const c = document.getElementById('drawCanvas');
+            const s = drawScale();
+            let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+            drawObjects.forEach(o => {
+                if (o.type === 'eraser') return;
+                const b = drawBBox(o), h = o.width / 2;
+                x1 = Math.min(x1, b.x1 - h); y1 = Math.min(y1, b.y1 - h);
+                x2 = Math.max(x2, b.x2 + h); y2 = Math.max(y2, b.y2 + h);
+            });
+            const pad = 8 * s;
+            x1 = Math.max(0, Math.floor(x1 - pad)); y1 = Math.max(0, Math.floor(y1 - pad));
+            x2 = Math.min(c.width, Math.ceil(x2 + pad)); y2 = Math.min(c.height, Math.ceil(y2 + pad));
+            if (!(x2 > x1 && y2 > y1)) { x1 = 0; y1 = 0; x2 = c.width; y2 = c.height; }
+            const cw = x2 - x1, ch = y2 - y1;
             const out = document.createElement('canvas');
             out.width = cw;
             out.height = ch;
             const octx = out.getContext('2d');
             octx.fillStyle = '#ffffff';
             octx.fillRect(0, 0, cw, ch);
-            octx.drawImage(c, minX, minY, cw, ch, 0, 0, cw, ch);
-            return { canvas: out, cssWidth: Math.round(cw / scale) };
+            drawObjects.forEach(o => drawRenderObject(octx, o, x1, y1));
+            return { canvas: out, cssWidth: Math.round(cw / s) };
         }
 
-        function drawPushUndo() {
-            const c = document.getElementById('drawCanvas');
-            const ctx = c.getContext('2d');
-            drawUndoStack.push(ctx.getImageData(0, 0, c.width, c.height));
-            if (drawUndoStack.length > 30) drawUndoStack.shift();
-        }
-
+        // ---------- 復原／刪除／清除 ----------
         function drawUndo() {
             if (drawUndoStack.length === 0) return;
-            const c = document.getElementById('drawCanvas');
-            c.getContext('2d').putImageData(drawUndoStack.pop(), 0, 0);
-            if (drawUndoStack.length === 0) drawDirty = false;
+            drawObjects = JSON.parse(drawUndoStack.pop());
+            drawSelected = null;
+            drawGesture = null;
+            drawRedraw();
+        }
+
+        function drawDeleteSelected() {
+            if (!drawSelected) return;
+            drawPushUndoState(drawSnapshot());
+            drawObjects = drawObjects.filter(o => o !== drawSelected);
+            drawSelected = null;
+            drawGesture = null;
+            drawRedraw();
         }
 
         function drawClear() {
-            const c = document.getElementById('drawCanvas');
-            const ctx = c.getContext('2d');
-            drawPushUndo();
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, c.width, c.height);
+            if (drawObjects.length === 0) return;
+            drawPushUndoState(drawSnapshot());
+            drawObjects = [];
+            drawSelected = null;
+            drawGesture = null;
+            drawRedraw();
         }
 
+        // ---------- 顏色／粗細／填滿：套用到「選取中」的圖形 ----------
+        function drawLoadControlsFromObject(o) {
+            const s = drawScale();
+            document.getElementById('drawColor').value = o.color || '#000000';
+            const w = Math.max(1, Math.min(30, Math.round(o.width / s)));
+            document.getElementById('drawWidth').value = w;
+            document.getElementById('drawWidthLabel').innerText = String(w);
+            if (drawIsClosedShape(o)) {
+                document.getElementById('drawFill').checked = !!o.fill;
+                document.getElementById('drawFillColor').value = o.fillColor || o.color || '#000000';
+            }
+            renderDrawRecentColors();
+        }
+
+        function drawApplyStyleToSelected() {
+            const o = drawSelected;
+            if (!o) return;
+            const before = drawSnapshot();
+            const s = drawScale();
+            o.color = document.getElementById('drawColor').value;
+            o.width = (parseInt(document.getElementById('drawWidth').value, 10) || 4) * s;
+            if (drawIsClosedShape(o)) {
+                o.fill = document.getElementById('drawFill').checked;
+                o.fillColor = document.getElementById('drawFillColor').value;
+            }
+            if (drawSnapshot() === before) return;
+            const now = Date.now();
+            // 連續拖動顏色／粗細時，合併成同一次「復原」
+            if (drawStyleEdit.obj !== o || now - drawStyleEdit.time > 800) drawPushUndoState(before);
+            drawStyleEdit = { obj: o, time: now };
+            drawRedraw();
+        }
+
+        function onDrawStyleChange() {
+            if (!drawSelected && drawFillLinked) {
+                document.getElementById('drawFillColor').value = document.getElementById('drawColor').value;
+            }
+            if (drawSelected && drawTool === 'select') drawApplyStyleToSelected();
+        }
+
+        function onDrawFillColorInput() {
+            drawFillLinked = false;
+            if (drawSelected && drawTool === 'select') {
+                if (drawIsClosedShape(drawSelected)) document.getElementById('drawFill').checked = true;
+                drawApplyStyleToSelected();
+            }
+        }
+
+        function onDrawWidthInput(v) {
+            document.getElementById('drawWidthLabel').innerText = v;
+            if (drawSelected && drawTool === 'select') drawApplyStyleToSelected();
+        }
+
+        // ---------- 畫布操作 ----------
         function drawGetPoint(e) {
             const c = document.getElementById('drawCanvas');
             const r = c.getBoundingClientRect();
@@ -1327,102 +1639,148 @@
             };
         }
 
-        function drawApplyStyle(ctx) {
-            const c = ctx.canvas;
-            const r = c.getBoundingClientRect();
-            const scale = c.width / r.width;
-            const color = document.getElementById('drawColor').value;
-            const width = parseInt(document.getElementById('drawWidth').value, 10) || 4;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            if (drawTool === 'eraser') {
-                ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = width * 2 * scale;
-            } else {
-                ctx.strokeStyle = color;
-                ctx.fillStyle = color;
-                ctx.lineWidth = width * scale;
+        function drawSelectDown(p, s) {
+            drawGesture = null;
+            if (drawSelected) {
+                const h = drawHitHandle(drawSelected, p, 14 * s);
+                if (h) {
+                    drawGesture = { mode: 'resize', handle: h.id, orig: drawClone(drawSelected), start: p };
+                    drawRedraw();
+                    return;
+                }
             }
+            let hit = drawFindHit(p, s);
+            // 已選取的「未填滿」圖形：點它的內部空白處也能拖移
+            if (!hit && drawSelected && drawSelected.type !== 'line') {
+                const b = drawBBox(drawSelected);
+                if (p.x >= b.x1 && p.x <= b.x2 && p.y >= b.y1 && p.y <= b.y2) hit = drawSelected;
+            }
+            if (hit) {
+                drawSelected = hit;
+                drawLoadControlsFromObject(hit);
+                drawGesture = { mode: 'move', orig: drawClone(hit), start: p };
+            } else {
+                drawSelected = null;
+            }
+            drawRedraw();
         }
 
-        function drawShape(ctx, tool, a, b) {
-            ctx.beginPath();
-            if (tool === 'line') {
-                ctx.moveTo(a.x, a.y);
-                ctx.lineTo(b.x, b.y);
-            } else if (tool === 'rect') {
-                ctx.rect(a.x, a.y, b.x - a.x, b.y - a.y);
-            } else if (tool === 'circle') {
-                ctx.ellipse((a.x + b.x) / 2, (a.y + b.y) / 2, Math.abs(b.x - a.x) / 2, Math.abs(b.y - a.y) / 2, 0, 0, Math.PI * 2);
-            } else if (tool === 'triangle') {
-                ctx.moveTo((a.x + b.x) / 2, a.y);
-                ctx.lineTo(b.x, b.y);
-                ctx.lineTo(a.x, b.y);
-                ctx.closePath();
-            } else if (tool === 'pentagon' || tool === 'hexagon') {
-                const n = tool === 'pentagon' ? 5 : 6;
-                const cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2;
-                const rx = Math.abs(b.x - a.x) / 2, ry = Math.abs(b.y - a.y) / 2;
-                for (let k = 0; k < n; k++) {
-                    const ang = -Math.PI / 2 + k * 2 * Math.PI / n;
-                    const px = cx + rx * Math.cos(ang), py = cy + ry * Math.sin(ang);
-                    if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        function drawUpdateHoverCursor(p) {
+            const c = document.getElementById('drawCanvas');
+            const s = drawScale();
+            let cur = 'default';
+            if (drawSelected) {
+                const h = drawHitHandle(drawSelected, p, 14 * s);
+                if (h) {
+                    cur = ({ nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize',
+                             n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize', p0: 'crosshair', p1: 'crosshair' })[h.id] || 'default';
                 }
-                ctx.closePath();
             }
-            if (tool !== 'line' && document.getElementById('drawFill').checked) ctx.fill();
-            ctx.stroke();
+            if (cur === 'default' && drawFindHit(p, s)) cur = 'move';
+            c.style.cursor = cur;
         }
 
         function drawPointerDown(e) {
             if (e.pointerType === 'mouse' && e.button !== 0) return;
             e.preventDefault();
             const c = document.getElementById('drawCanvas');
-            const ctx = c.getContext('2d');
             try { c.setPointerCapture(e.pointerId); } catch (err) {}
-            drawPushUndo();
-            drawSnapshot = drawUndoStack[drawUndoStack.length - 1];
-            drawing = true;
-            drawDirty = true;
-            drawStartPt = drawGetPoint(e);
             closeDrawShapeMenu();
-            if (drawTool !== 'eraser') addDrawRecentColor(document.getElementById('drawColor').value);
-            drawLastPt = drawStartPt;
-            drawApplyStyle(ctx);
+            const p = drawGetPoint(e);
+            const s = drawScale();
+            drawBefore = drawSnapshot();
+            drawStartPt = p;
+
+            if (drawTool === 'select') { drawSelectDown(p, s); return; }
+
+            const color = document.getElementById('drawColor').value;
+            const width = (parseInt(document.getElementById('drawWidth').value, 10) || 4) * s;
+            drawing = true;
             if (drawTool === 'pen' || drawTool === 'eraser') {
-                ctx.beginPath();
-                ctx.moveTo(drawStartPt.x, drawStartPt.y);
-                ctx.lineTo(drawStartPt.x + 0.01, drawStartPt.y + 0.01);
-                ctx.stroke();
+                drawCurrent = { type: drawTool, pts: [p], color: color, width: (drawTool === 'eraser') ? width * 2 : width };
+                drawRenderObject(c.getContext('2d'), drawCurrent, 0, 0);
+                if (drawTool === 'pen') addDrawRecentColor(color);
+            } else if (drawTool === 'line') {
+                drawCurrent = { type: 'line', a: p, b: p, color: color, width: width };
+                addDrawRecentColor(color);
+            } else {
+                const fillColor = document.getElementById('drawFillColor').value;
+                drawCurrent = { type: drawTool, a: p, b: p, color: color, width: width,
+                                fill: document.getElementById('drawFill').checked, fillColor: fillColor };
+                addDrawRecentColor(color);
             }
         }
 
         function drawPointerMove(e) {
-            if (!drawing) return;
-            e.preventDefault();
-            const c = document.getElementById('drawCanvas');
-            const ctx = c.getContext('2d');
-            let p = drawGetPoint(e);
-            if (drawTool !== 'pen' && drawTool !== 'eraser' && (e.shiftKey || drawProportional)) {
-                p = drawConstrainPoint(drawStartPt, p, drawTool);
+            const p = drawGetPoint(e);
+            if (drawGesture) {
+                e.preventDefault();
+                const o = drawSelected;
+                if (!o) return;
+                if (drawGesture.mode === 'move') {
+                    drawTranslate(o, drawGesture.orig, p.x - drawGesture.start.x, p.y - drawGesture.start.y);
+                } else {
+                    drawResize(o, drawGesture.orig, drawGesture.handle, p, e.shiftKey || drawProportional);
+                }
+                drawRedraw();
+                return;
             }
-            if (drawTool === 'pen' || drawTool === 'eraser') {
+            if (!drawing) {
+                if (drawTool === 'select') drawUpdateHoverCursor(p);
+                return;
+            }
+            e.preventDefault();
+            if (drawCurrent.type === 'pen' || drawCurrent.type === 'eraser') {
+                const ctx = document.getElementById('drawCanvas').getContext('2d');
+                const last = drawCurrent.pts[drawCurrent.pts.length - 1];
+                drawCurrent.pts.push(p);
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.lineWidth = drawCurrent.width;
+                ctx.strokeStyle = (drawCurrent.type === 'eraser') ? '#ffffff' : drawCurrent.color;
                 ctx.beginPath();
-                ctx.moveTo(drawLastPt.x, drawLastPt.y);
+                ctx.moveTo(last.x, last.y);
                 ctx.lineTo(p.x, p.y);
                 ctx.stroke();
-                drawLastPt = p;
             } else {
-                ctx.putImageData(drawSnapshot, 0, 0);
-                drawApplyStyle(ctx);
-                drawShape(ctx, drawTool, drawStartPt, p);
+                let q = p;
+                if (e.shiftKey || drawProportional) q = drawConstrainPoint(drawStartPt, p, drawCurrent.type);
+                drawCurrent.b = q;
+                drawRedraw();
             }
         }
 
         function drawPointerUp(e) {
+            try { document.getElementById('drawCanvas').releasePointerCapture(e.pointerId); } catch (err) {}
+            if (drawGesture) {
+                drawGesture = null;
+                if (drawSnapshot() !== drawBefore) drawPushUndoState(drawBefore);
+                drawRedraw();
+                return;
+            }
             if (!drawing) return;
             drawing = false;
-            try { document.getElementById('drawCanvas').releasePointerCapture(e.pointerId); } catch (err) {}
+            const o = drawCurrent;
+            drawCurrent = null;
+            if (o) {
+                const s = drawScale();
+                let keep = true;
+                if (o.type === 'line') {
+                    keep = Math.hypot(o.b.x - o.a.x, o.b.y - o.a.y) >= 3 * s;
+                } else if (o.type !== 'pen' && o.type !== 'eraser') {
+                    keep = Math.abs(o.b.x - o.a.x) >= 3 * s && Math.abs(o.b.y - o.a.y) >= 3 * s;
+                    if (keep) {
+                        const b = drawBBox(o);
+                        o.a = { x: b.x1, y: b.y1 };
+                        o.b = { x: b.x2, y: b.y2 };
+                    }
+                }
+                if (keep) {
+                    drawObjects.push(o);
+                    drawPushUndoState(drawBefore);
+                }
+            }
+            drawRedraw();
         }
 
         (function initDrawCanvasEvents() {
@@ -1433,14 +1791,22 @@
             c.addEventListener('pointercancel', drawPointerUp);
         })();
 
+        // 電腦版：選取圖形後按 Delete 鍵可刪除
+        document.addEventListener('keydown', function(e) {
+            if (!inputDrawMode || !drawSelected || e.key !== 'Delete') return;
+            const tag = document.activeElement ? document.activeElement.tagName : '';
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+            e.preventDefault();
+            drawDeleteSelected();
+        });
+
         // 把畫好的圖上傳到 Cloudinary，再插入到文字內容中原本游標的位置
         function insertDrawingToContent() {
-            if (!drawDirty) { alert('請先畫點東西'); return; }
-            const c = document.getElementById('drawCanvas');
+            if (!drawObjects.some(o => o.type !== 'eraser')) { alert('請先畫點東西'); return; }
             const btn = document.getElementById('drawInsertBtn');
             btn.disabled = true;
             btn.innerText = '⏳ 上傳中...';
-            const cropped = getCroppedDrawingCanvas();
+            const cropped = drawExportCanvas();
             const cssW = cropped.cssWidth;
             cropped.canvas.toBlob(async function(blob) {
                 if (!blob) {
@@ -1451,9 +1817,12 @@
                 }
                 const cloudName = 'keloftva';
                 const uploadPreset = 'ml_default';
+                // 每次都用「不重複」的檔名與 public_id，避免 Cloudinary 認為是同一張圖而一直回傳第一次上傳的舊圖
+                const uniqueId = 'drawing_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
                 const formData = new FormData();
-                formData.append('file', blob, 'drawing.png');
+                formData.append('file', blob, uniqueId + '.png');
                 formData.append('upload_preset', uploadPreset);
+                formData.append('public_id', uniqueId);
                 try {
                     const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
                         method: 'POST',
@@ -1465,7 +1834,8 @@
                         insertDrawingImage(result.secure_url, cssW);
                         drawSavedRange = null;
                         drawNeedsInit = true;   // 下次進入手寫會是全新的空白畫布
-                        drawDirty = false;
+                        drawObjects = [];
+                        drawSelected = null;
                         drawUndoStack = [];
                     } else {
                         alert('上傳失敗：' + (result.error ? result.error.message : '未知錯誤'));
