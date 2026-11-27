@@ -496,7 +496,9 @@
             background: var(--input-bg); color: var(--text-color);
             font-size: 14px; cursor: pointer;
         }
-        .draw-tool-btn.active { background: var(--primary-color); color: #fff; border-color: var(--primary-color); }
+        .draw-tool-btn.active { background: var(--input-bg); color: var(--text-color); border-color: var(--primary-color); box-shadow: 0 0 0 1px var(--primary-color); }
+        .draw-tool-btn svg { width: 18px; height: 18px; vertical-align: middle; }
+        .draw-tool-btn.draw-del-sel { color: var(--danger-color); }
         .draw-tool-btn:active { opacity: 0.7; }
         .draw-color-input { width: 32px; height: 30px; padding: 0; border: 1px solid var(--border-color); border-radius: 6px; background: none; cursor: pointer; }
         .draw-width-wrap { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-secondary); }
@@ -593,7 +595,7 @@
                         <button type="button" id="inputTextColorBtn" class="color-swatch-btn" onclick="openColorPanel(this, 'color', 'noteContent')">A<span class="color-bar" id="inputTextColorBar"></span></button>
                         <button type="button" id="inputBgColorBtn" class="color-swatch-btn" onclick="openColorPanel(this, 'backgroundColor', 'noteContent')">A<span class="color-bar" id="inputBgColorBar"></span></button>
                         <button type="button" class="numbering-trigger-btn" onclick="openNumberingPanel(this, 'noteContent')">№</button>
-                        <button type="button" id="drawToggleBtn" class="draw-toggle-btn" onclick="toggleDrawMode()" title="切換：輸入文字／手寫畫圖">✏️</button>
+                        <button type="button" id="drawToggleBtn" class="draw-toggle-btn" onclick="toggleDrawMode()" title="手寫畫圖">🎨</button>
                     </div>
                     <div class="reminder-col" id="inputReminderCol">
                         <div class="reminder-group">
@@ -622,11 +624,11 @@
 
             <div id="noteContent" class="input-style rich-content" contenteditable="true" style="margin-bottom:10px; overflow-y:auto;" data-placeholder="輸入內容" onfocus="document.execCommand('defaultParagraphSeparator', false, 'br')" onpaste="handleRichPaste(event)" oninput="handleSuggest('content')" onkeydown="handleListEnterKey(event, 'noteContent')"></div>
 
-            <!-- 手寫畫圖面板（點工具列的 ✏️／⌨️ 切換） -->
+            <!-- 手寫畫圖面板（點工具列的 🎨 進入，點「⌨️ 文字」回到文字輸入） -->
             <div id="drawPanel" class="draw-panel" style="display:none;">
                 <div class="draw-tools">
-                    <button type="button" class="draw-tool-btn" onclick="exitDrawMode()" title="回到文字輸入">⌨️ 文字</button>
-                    <button type="button" class="draw-tool-btn active" data-tool="pen" onclick="setDrawTool('pen')" title="自由線條">✏️</button>
+                    <button type="button" class="draw-tool-btn" onclick="exitDrawMode()" title="回到文字輸入">⌨️</button>
+                    <button type="button" class="draw-tool-btn active" data-tool="pen" onclick="setDrawTool('pen')" title="自由線條">🖊️</button>
                     <button type="button" class="draw-tool-btn" data-tool="eraser" onclick="setDrawTool('eraser')" title="橡皮擦">🧽</button>
                     <button type="button" class="draw-tool-btn" data-tool="line" onclick="setDrawTool('line')" title="直線">╱</button>
                     <div class="draw-shape-wrap">
@@ -639,8 +641,8 @@
                             <button type="button" class="draw-tool-btn" data-shape="hexagon" onclick="setDrawTool('hexagon')" title="六角形">⬡</button>
                         </div>
                     </div>
-                                        <button type="button" class="draw-tool-btn" id="drawLockBtn" onclick="toggleDrawProportional()" title="等比例（電腦版也可按住 Shift）">🔒 等比</button>
-                    <button type="button" class="draw-tool-btn" data-tool="select" onclick="setDrawTool('select')" title="選取已畫好的圖形，可移動、縮放、改顏色">👆 選取</button>
+                                        <button type="button" class="draw-tool-btn" id="drawLockBtn" onclick="toggleDrawProportional()" title="等比例（電腦版也可按住 Shift）">🔒</button>
+                    <button type="button" class="draw-tool-btn" data-tool="select" onclick="setDrawTool('select')" title="選取已畫好的圖形：可移動、縮放、旋轉、改顏色">👆</button>
                 </div>
                 <div class="draw-tools" style="margin-top:6px;">
                     <input type="color" id="drawColor" class="draw-color-input" value="#000000" title="線條顏色" oninput="onDrawStyleChange()" onchange="onDrawColorChange()">
@@ -648,10 +650,11 @@
                         <input type="range" id="drawWidth" min="1" max="30" value="4" oninput="onDrawWidthInput(this.value)">
                         <span id="drawWidthLabel">4</span>
                     </div>
-                    <label class="draw-fill-label"><input type="checkbox" id="drawFill" onchange="onDrawStyleChange()">填滿</label>
+                    <button type="button" class="draw-tool-btn" id="drawFillBtn" onclick="toggleDrawFill()" title="填滿（點一下開啟／再點關閉）"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M16.56 8.94L7.62 0 6.21 1.41l2.38 2.38-5.15 5.15c-.59.59-.59 1.54 0 2.12l5.5 5.5c.29.29.68.44 1.06.44s.77-.15 1.06-.44l5.5-5.5c.59-.58.59-1.53 0-2.12zM5.21 10L10 5.21 14.79 10H5.21zM19 11.5s-2 2.17-2 3.5c0 1.1.9 2 2 2s2-.9 2-2c0-1.33-2-3.5-2-3.5z"/><rect id="drawFillBar" x="2" y="20" width="20" height="4" fill="#000000"/></svg></button>
+                    <input type="checkbox" id="drawFill" style="display:none;">
                     <input type="color" id="drawFillColor" class="draw-color-input" value="#000000" title="填滿顏色" oninput="onDrawFillColorInput()">
                     <button type="button" class="draw-tool-btn" onclick="drawUndo()" title="復原">↶</button>
-                    <button type="button" class="draw-tool-btn" onclick="drawDeleteSelected()" title="刪除所選圖形">✖所選</button>
+                    <button type="button" class="draw-tool-btn draw-del-sel" onclick="drawDeleteSelected()" title="刪除所選取的圖形"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="3.2 3"/><path d="M9 9l6 6M15 9l-6 6"/></svg></button>
                     <button type="button" class="draw-tool-btn" onclick="drawClear()" title="清除整張畫布">🗑️</button>
                 </div>
                 <div class="draw-recent-colors" id="drawRecentColors"></div>
@@ -1127,6 +1130,16 @@
         }
         function drawIsClosedShape(o) { return !!o && o.type !== 'pen' && o.type !== 'eraser' && o.type !== 'line'; }
 
+        // 旋轉：封閉圖形以 rot（弧度）記錄旋轉角度，繞著自己的中心轉；手繪線則直接轉動各個點
+        function drawCenter(o) { const b = drawBBox(o); return { x: (b.x1 + b.x2) / 2, y: (b.y1 + b.y2) / 2 }; }
+        function drawRotPt(p, c, ang) {
+            const cos = Math.cos(ang), sin = Math.sin(ang), dx = p.x - c.x, dy = p.y - c.y;
+            return { x: c.x + dx * cos - dy * sin, y: c.y + dx * sin + dy * cos };
+        }
+        function drawToLocal(o, p) { return (drawIsClosedShape(o) && o.rot) ? drawRotPt(p, drawCenter(o), -o.rot) : p; }
+        function drawFromLocal(o, p) { return (drawIsClosedShape(o) && o.rot) ? drawRotPt(p, drawCenter(o), o.rot) : p; }
+        function drawNormAngle(a) { return ((a + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI; }
+
         function resetDrawState() {
             exitDrawMode();
             drawObjects = [];
@@ -1157,6 +1170,8 @@
                 drawSavedRange = r;
             }
             inputDrawMode = true;
+            const toolbarBox = document.querySelector('#inputModal .reminder-row-scroll');
+            if (toolbarBox) toolbarBox.style.display = 'none';
             el.style.display = 'none';
             document.getElementById('drawPanel').style.display = 'flex';
             renderDrawRecentColors();
@@ -1172,8 +1187,10 @@
             if (panel) panel.style.display = 'none';
             const tb = document.getElementById('inputRichToolbar');
             if (tb) tb.classList.remove('draw-mode');
+            const toolbarBox = document.querySelector('#inputModal .reminder-row-scroll');
+            if (toolbarBox) toolbarBox.style.display = '';
             const tgl = document.getElementById('drawToggleBtn');
-            if (tgl) tgl.innerText = '✏️';
+            if (tgl) tgl.innerText = '🎨';
             closeDrawShapeMenu();
             inputDrawMode = false;
         }
@@ -1289,6 +1306,7 @@
             addDrawRecentColor(document.getElementById('drawColor').value);
         }
         renderDrawRecentColors();
+        drawSyncFillBtn();
 
         // ---------- 幾何計算（選取、點擊判斷、縮放用）----------
         function drawBBox(o) {
@@ -1320,6 +1338,22 @@
             return pts;
         }
 
+        // 含旋轉後的實際外框（輸出圖片裁切用）
+        function drawWorldBBox(o) {
+            if (drawIsClosedShape(o) && o.rot) {
+                let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+                drawShapeVertices(o).forEach(q => {
+                    const w = drawFromLocal(o, q);
+                    if (w.x < x1) x1 = w.x;
+                    if (w.y < y1) y1 = w.y;
+                    if (w.x > x2) x2 = w.x;
+                    if (w.y > y2) y2 = w.y;
+                });
+                return { x1, y1, x2, y2 };
+            }
+            return drawBBox(o);
+        }
+
         function drawDistToSeg(p, a, b) {
             const dx = b.x - a.x, dy = b.y - a.y;
             const len2 = dx * dx + dy * dy;
@@ -1348,11 +1382,12 @@
                 return false;
             }
             if (o.type === 'line') return drawDistToSeg(p, o.a, o.b) <= half;
+            const q = drawToLocal(o, p);   // 圖形可能被旋轉：先把點轉回圖形自己的座標系再比對
             const v = drawShapeVertices(o);
             for (let i = 0; i < v.length; i++) {
-                if (drawDistToSeg(p, v[i], v[(i + 1) % v.length]) <= half) return true;
+                if (drawDistToSeg(q, v[i], v[(i + 1) % v.length]) <= half) return true;
             }
-            return !!o.fill && drawPointInPolygon(p, v);
+            return !!o.fill && drawPointInPolygon(q, v);
         }
 
         function drawFindHit(p, s) {
@@ -1376,10 +1411,23 @@
             ];
         }
 
-        function drawHitHandle(o, p, r) {
+        // 旋轉鈕：在選取框「右上角」的外側（直線不需要，拖端點即可）
+        function drawRotateHandle(o, s) {
+            if (o.type === 'line' || o.type === 'eraser') return null;
+            const b = drawBBox(o);
+            const d = 24 * s / Math.SQRT2;
+            return { id: 'rot', x: b.x2 + d, y: b.y1 - d };
+        }
+
+        // p 為畫布上的實際座標；s 為畫布縮放比例
+        function drawHitHandle(o, p, s) {
+            const q = drawToLocal(o, p);
+            const rh = drawRotateHandle(o, s);
+            if (rh && Math.hypot(q.x - rh.x, q.y - rh.y) <= 12 * s) return rh;
+            const r = 14 * s;
             const hs = drawGetHandles(o);
             for (let i = 0; i < hs.length; i++) {
-                if (Math.abs(p.x - hs[i].x) <= r && Math.abs(p.y - hs[i].y) <= r) return hs[i];
+                if (Math.abs(q.x - hs[i].x) <= r && Math.abs(q.y - hs[i].y) <= r) return hs[i];
             }
             return null;
         }
@@ -1407,6 +1455,9 @@
             }
             const ob = drawBBox(orig);
             const ow = ob.x2 - ob.x1, oh = ob.y2 - ob.y1;
+            const rot = (drawIsClosedShape(orig) && orig.rot) ? orig.rot : 0;
+            const c0 = drawCenter(orig);
+            if (rot) p = drawRotPt(p, c0, -rot);   // 把指標轉進圖形自己的（未旋轉）座標系
             let x1 = ob.x1, y1 = ob.y1, x2 = ob.x2, y2 = ob.y2;
             if (keepRatio && id.length === 2 && ow > 0 && oh > 0) {
                 const fx = id.indexOf('w') >= 0 ? ob.x2 : ob.x1;
@@ -1429,8 +1480,26 @@
                     y: oh > 0.5 ? y1 + (q.y - ob.y1) * ((y2 - y1) / oh) : q.y
                 }));
             } else {
-                o.a = { x: Math.min(x1, x2), y: Math.min(y1, y2) };
-                o.b = { x: Math.max(x1, x2), y: Math.max(y1, y2) };
+                // 新外框的中心要換算回實際座標；旋轉過的圖形，被拖的那一邊對邊會留在原地
+                const m = { x: (x1 + x2) / 2, y: (y1 + y2) / 2 };
+                const c1 = rot ? drawRotPt(m, c0, rot) : m;
+                const w = Math.abs(x2 - x1), h = Math.abs(y2 - y1);
+                o.a = { x: c1.x - w / 2, y: c1.y - h / 2 };
+                o.b = { x: c1.x + w / 2, y: c1.y + h / 2 };
+            }
+        }
+
+        // 拖旋轉鈕：封閉圖形改 rot；手繪線轉動各點。Shift 或「🔒」時，每 15° 吸附一次
+        function drawRotateObject(o, orig, c, startAngle, p, snap) {
+            let delta = Math.atan2(p.y - c.y, p.x - c.x) - startAngle;
+            const step = Math.PI / 12;
+            if (drawIsClosedShape(o)) {
+                let rot = (orig.rot || 0) + delta;
+                if (snap) rot = Math.round(rot / step) * step;
+                o.rot = drawNormAngle(rot);
+            } else {
+                if (snap) delta = Math.round(delta / step) * step;
+                o.pts = orig.pts.map(q => drawRotPt(q, c, delta));
             }
         }
 
@@ -1485,9 +1554,17 @@
                 ctx.stroke();
                 return;
             }
+            ctx.save();
+            if (o.rot) {
+                const cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2;
+                ctx.translate(cx, cy);
+                ctx.rotate(o.rot);
+                ctx.translate(-cx, -cy);
+            }
             drawShapePath(ctx, o.type, a, b);
             if (o.fill) { ctx.fillStyle = o.fillColor || o.color; ctx.fill(); }
             ctx.stroke();
+            ctx.restore();
         }
 
         // 選取框與控制點（只畫在畫布上，不會被匯出到圖片）
@@ -1496,6 +1573,12 @@
             ctx.save();
             ctx.lineWidth = 1.5 * s;
             ctx.strokeStyle = '#007AFF';
+            if (drawIsClosedShape(o) && o.rot) {
+                const c = drawCenter(o);
+                ctx.translate(c.x, c.y);
+                ctx.rotate(o.rot);
+                ctx.translate(-c.x, -c.y);
+            }
             if (o.type !== 'line') {
                 const b = drawBBox(o);
                 ctx.setLineDash([6 * s, 4 * s]);
@@ -1510,6 +1593,34 @@
                 ctx.fill();
                 ctx.stroke();
             });
+            const rh = drawRotateHandle(o, s);
+            if (rh) {
+                const b = drawBBox(o);
+                // 旋轉鈕與右上角之間的連接線
+                ctx.beginPath();
+                ctx.moveTo(b.x2, b.y1);
+                ctx.lineTo(rh.x, rh.y);
+                ctx.stroke();
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(rh.x, rh.y, 9 * s, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+                // 圓形箭頭圖樣 ↻
+                const ang = 1.8 * Math.PI, r = 4.5 * s;
+                ctx.beginPath();
+                ctx.arc(rh.x, rh.y, r, 0.3 * Math.PI, ang);
+                ctx.stroke();
+                const ex = rh.x + r * Math.cos(ang), ey = rh.y + r * Math.sin(ang);
+                const tx = -Math.sin(ang), ty = Math.cos(ang), nx = Math.cos(ang), ny = Math.sin(ang);
+                ctx.beginPath();
+                ctx.moveTo(ex + tx * 3.5 * s, ey + ty * 3.5 * s);
+                ctx.lineTo(ex + nx * 2.5 * s, ey + ny * 2.5 * s);
+                ctx.lineTo(ex - nx * 2.5 * s, ey - ny * 2.5 * s);
+                ctx.closePath();
+                ctx.fillStyle = '#007AFF';
+                ctx.fill();
+            }
             ctx.restore();
         }
 
@@ -1530,7 +1641,7 @@
             let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
             drawObjects.forEach(o => {
                 if (o.type === 'eraser') return;
-                const b = drawBBox(o), h = o.width / 2;
+                const b = drawWorldBBox(o), h = o.width / 2;
                 x1 = Math.min(x1, b.x1 - h); y1 = Math.min(y1, b.y1 - h);
                 x2 = Math.max(x2, b.x2 + h); y2 = Math.max(y2, b.y2 + h);
             });
@@ -1587,6 +1698,7 @@
                 document.getElementById('drawFill').checked = !!o.fill;
                 document.getElementById('drawFillColor').value = o.fillColor || o.color || '#000000';
             }
+            drawSyncFillBtn();
             renderDrawRecentColors();
         }
 
@@ -1609,10 +1721,26 @@
             drawRedraw();
         }
 
+        // 「填滿」按鈕（油漆桶圖樣）：按下去＝開啟填滿；圖樣下方的色條顯示目前的填滿顏色
+        function drawSyncFillBtn() {
+            const btn = document.getElementById('drawFillBtn');
+            if (!btn) return;
+            btn.classList.toggle('active', document.getElementById('drawFill').checked);
+            const bar = document.getElementById('drawFillBar');
+            if (bar) bar.setAttribute('fill', document.getElementById('drawFillColor').value);
+        }
+
+        function toggleDrawFill() {
+            const cb = document.getElementById('drawFill');
+            cb.checked = !cb.checked;
+            onDrawStyleChange();
+        }
+
         function onDrawStyleChange() {
             if (!drawSelected && drawFillLinked) {
                 document.getElementById('drawFillColor').value = document.getElementById('drawColor').value;
             }
+            drawSyncFillBtn();
             if (drawSelected && drawTool === 'select') drawApplyStyleToSelected();
         }
 
@@ -1620,8 +1748,9 @@
             drawFillLinked = false;
             if (drawSelected && drawTool === 'select') {
                 if (drawIsClosedShape(drawSelected)) document.getElementById('drawFill').checked = true;
-                drawApplyStyleToSelected();
             }
+            drawSyncFillBtn();
+            if (drawSelected && drawTool === 'select') drawApplyStyleToSelected();
         }
 
         function onDrawWidthInput(v) {
@@ -1642,7 +1771,14 @@
         function drawSelectDown(p, s) {
             drawGesture = null;
             if (drawSelected) {
-                const h = drawHitHandle(drawSelected, p, 14 * s);
+                const h = drawHitHandle(drawSelected, p, s);
+                if (h && h.id === 'rot') {
+                    const c0 = drawCenter(drawSelected);
+                    drawGesture = { mode: 'rotate', orig: drawClone(drawSelected), center: c0,
+                                    startAngle: Math.atan2(p.y - c0.y, p.x - c0.x), start: p };
+                    drawRedraw();
+                    return;
+                }
                 if (h) {
                     drawGesture = { mode: 'resize', handle: h.id, orig: drawClone(drawSelected), start: p };
                     drawRedraw();
@@ -1653,7 +1789,8 @@
             // 已選取的「未填滿」圖形：點它的內部空白處也能拖移
             if (!hit && drawSelected && drawSelected.type !== 'line') {
                 const b = drawBBox(drawSelected);
-                if (p.x >= b.x1 && p.x <= b.x2 && p.y >= b.y1 && p.y <= b.y2) hit = drawSelected;
+                const q = drawToLocal(drawSelected, p);
+                if (q.x >= b.x1 && q.x <= b.x2 && q.y >= b.y1 && q.y <= b.y2) hit = drawSelected;
             }
             if (hit) {
                 drawSelected = hit;
@@ -1670,8 +1807,10 @@
             const s = drawScale();
             let cur = 'default';
             if (drawSelected) {
-                const h = drawHitHandle(drawSelected, p, 14 * s);
-                if (h) {
+                const h = drawHitHandle(drawSelected, p, s);
+                if (h && h.id === 'rot') {
+                    cur = 'grab';
+                } else if (h) {
                     cur = ({ nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize',
                              n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize', p0: 'crosshair', p1: 'crosshair' })[h.id] || 'default';
                 }
@@ -1719,6 +1858,8 @@
                 if (!o) return;
                 if (drawGesture.mode === 'move') {
                     drawTranslate(o, drawGesture.orig, p.x - drawGesture.start.x, p.y - drawGesture.start.y);
+                } else if (drawGesture.mode === 'rotate') {
+                    drawRotateObject(o, drawGesture.orig, drawGesture.center, drawGesture.startAngle, p, e.shiftKey || drawProportional);
                 } else {
                     drawResize(o, drawGesture.orig, drawGesture.handle, p, e.shiftKey || drawProportional);
                 }
